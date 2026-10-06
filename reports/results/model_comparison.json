@@ -1,0 +1,59 @@
+{
+  "1_keyword_baseline": {
+    "accuracy": 0.4944,
+    "precision_macro": 0.1648,
+    "recall_macro": 0.3333,
+    "f1_macro": 0.2206
+  },
+  "2_tfidf_baseline": {
+    "accuracy": 0.4944,
+    "precision_macro": 0.1648,
+    "recall_macro": 0.3333,
+    "f1_macro": 0.2206
+  },
+  "3_semantic_baseline": {
+    "accuracy": 0.4916,
+    "precision_macro": 0.5337,
+    "recall_macro": 0.4457,
+    "f1_macro": 0.4215
+  },
+  "4_logistic_regression": {
+    "accuracy": 0.6983,
+    "precision_macro": 0.6699,
+    "recall_macro": 0.6963,
+    "f1_macro": 0.6794,
+    "roc_auc_macro_ovr": 0.8764,
+    "train_time_seconds": 0.0273,
+    "inference_time_seconds_per_pair": 3e-06
+  },
+  "5_random_forest": {
+    "accuracy": 0.7318,
+    "precision_macro": 0.7209,
+    "recall_macro": 0.718,
+    "f1_macro": 0.7167,
+    "roc_auc_macro_ovr": 0.8926,
+    "train_time_seconds": 0.6565,
+    "inference_time_seconds_per_pair": 0.000136
+  },
+  "6_svm": {
+    "accuracy": 0.7095,
+    "precision_macro": 0.702,
+    "recall_macro": 0.7044,
+    "f1_macro": 0.6999,
+    "roc_auc_macro_ovr": 0.892,
+    "train_time_seconds": 0.3979,
+    "inference_time_seconds_per_pair": 0.000227
+  },
+  "7_final_hybrid_weighted": {
+    "accuracy": 0.5084,
+    "precision_macro": 0.2965,
+    "recall_macro": 0.3493,
+    "f1_macro": 0.2573
+  },
+  "regression_experiment_random_forest": {
+    "rmse": 0.1197,
+    "mae": 0.0902,
+    "r2": 0.759,
+    "note": "Secondary experiment predicting the continuous ai_match_score (spec.md section 18)."
+  }
+}

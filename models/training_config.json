@@ -1,0 +1,36 @@
+{
+  "random_state": 42,
+  "strong_match_threshold": 70,
+  "moderate_match_threshold": 40,
+  "tfidf_max_features": 20000,
+  "tfidf_ngram_range": [
+    1,
+    2
+  ],
+  "feature_columns": [
+    "skill_coverage",
+    "num_matched_skills",
+    "num_missing_skills",
+    "tfidf_similarity",
+    "semantic_similarity",
+    "resume_length",
+    "job_description_length",
+    "experience_compatibility",
+    "education_compatibility"
+  ],
+  "class_labels": [
+    "weak",
+    "moderate",
+    "strong"
+  ],
+  "train_size": 1668,
+  "val_size": 357,
+  "test_size": 358,
+  "hybrid_weights": {
+    "skill_coverage": 0.35,
+    "semantic_similarity": 0.3,
+    "tfidf_similarity": 0.15,
+    "experience_compatibility": 0.1,
+    "education_compatibility": 0.1
+  }
+}

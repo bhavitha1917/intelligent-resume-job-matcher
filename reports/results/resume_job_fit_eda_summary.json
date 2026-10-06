@@ -1,0 +1,131 @@
+{
+  "dataset_name": "batuhanmtl/job_resume_fit",
+  "num_rows": 2385,
+  "num_columns": 10,
+  "columns": [
+    "ID",
+    "resume_text",
+    "job_text",
+    "category",
+    "job_required_skills",
+    "resume_skill_list",
+    "ai_matched_skills",
+    "ai_match_score",
+    "skill_string_match_score",
+    "fuzzy_match_score"
+  ],
+  "missing_values_per_column": {
+    "ID": 0,
+    "resume_text": 0,
+    "job_text": 0,
+    "category": 0,
+    "job_required_skills": 0,
+    "resume_skill_list": 0,
+    "ai_matched_skills": 0,
+    "ai_match_score": 0,
+    "skill_string_match_score": 0,
+    "fuzzy_match_score": 0
+  },
+  "num_duplicate_ids": 0,
+  "num_duplicate_resume_text": 2,
+  "num_categories": 23,
+  "category_distribution": {
+    "INFORMATION-TECHNOLOGY": 120,
+    "BUSINESS-DEVELOPMENT": 120,
+    "CHEF": 118,
+    "FINANCE": 118,
+    "ENGINEERING": 118,
+    "ACCOUNTANT": 118,
+    "ADVOCATE": 117,
+    "FITNESS": 117,
+    "SALES": 116,
+    "AVIATION": 116,
+    "HEALTHCARE": 115,
+    "CONSULTANT": 115,
+    "BANKING": 115,
+    "CONSTRUCTION": 112,
+    "PUBLIC-RELATIONS": 111,
+    "HR": 110,
+    "DESIGNER": 107,
+    "ARTS": 103,
+    "TEACHER": 102,
+    "DIGITAL-MEDIA": 96,
+    "AGRICULTURE": 63,
+    "AUTOMOBILE": 36,
+    "BPO": 22
+  },
+  "resume_text_length_words": {
+    "mean": 811.2888888888889,
+    "median": 756.0,
+    "min": 0,
+    "max": 5190
+  },
+  "job_text_length_words": {
+    "mean": 599.1345911949686,
+    "median": 605.0,
+    "min": 464,
+    "max": 638
+  },
+  "score_statistics": {
+    "ai_match_score": {
+      "mean": 44.03586163522012,
+      "median": 40.65,
+      "std": 24.628549231960772,
+      "min": 0.0,
+      "max": 100.0
+    },
+    "skill_string_match_score": {
+      "mean": 11.55425995807128,
+      "median": 10.0,
+      "std": 7.487029912606148,
+      "min": 0.0,
+      "max": 41.67
+    },
+    "fuzzy_match_score": {
+      "mean": 56.579698113207556,
+      "median": 56.4,
+      "std": 6.7781102095534695,
+      "min": 26.15,
+      "max": 84.41
+    }
+  },
+  "score_correlation": {
+    "ai_match_score": {
+      "ai_match_score": 1.0,
+      "skill_string_match_score": 0.615,
+      "fuzzy_match_score": 0.634
+    },
+    "skill_string_match_score": {
+      "ai_match_score": 0.615,
+      "skill_string_match_score": 1.0,
+      "fuzzy_match_score": 0.716
+    },
+    "fuzzy_match_score": {
+      "ai_match_score": 0.634,
+      "skill_string_match_score": 0.716,
+      "fuzzy_match_score": 1.0
+    }
+  },
+  "top_20_job_required_skills": {
+    "problem solving": 1931,
+    "communication": 1895,
+    "leadership": 1373,
+    "team management": 962,
+    "mentoring": 931,
+    "collaboration": 917,
+    "time management": 910,
+    "flexibility": 799,
+    "strategic thinking": 795,
+    "relationship building": 785,
+    "organizational skills": 734,
+    "budget management": 701,
+    "presentation skills": 698,
+    "project management": 677,
+    "analytical skills": 591,
+    "interpersonal skills": 569,
+    "adaptability": 537,
+    "motivation": 526,
+    "business acumen": 524,
+    "attention to detail": 472
+  }
+}

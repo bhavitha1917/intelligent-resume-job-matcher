@@ -1,0 +1,34 @@
+{
+  "keyword_baseline": {
+    "precision_at_k": 0.0067,
+    "recall_at_k": 0.0335,
+    "mrr": 0.06,
+    "ndcg_at_k": 0.0178,
+    "k": 5,
+    "num_queries": 358
+  },
+  "semantic_baseline": {
+    "precision_at_k": 0.0983,
+    "recall_at_k": 0.4916,
+    "mrr": 0.3996,
+    "ndcg_at_k": 0.4217,
+    "k": 5,
+    "num_queries": 358
+  },
+  "final_hybrid_weighted": {
+    "precision_at_k": 0.0972,
+    "recall_at_k": 0.486,
+    "mrr": 0.3705,
+    "ndcg_at_k": 0.3973,
+    "k": 5,
+    "num_queries": 358
+  },
+  "random_forest": {
+    "precision_at_k": 0.1,
+    "recall_at_k": 0.5,
+    "mrr": 0.4026,
+    "ndcg_at_k": 0.4266,
+    "k": 5,
+    "num_queries": 358
+  }
+}
