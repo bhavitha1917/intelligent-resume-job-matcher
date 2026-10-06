@@ -1,0 +1,18 @@
+SUMMARY
+Backend software engineer with a growing interest in data-driven systems.
+
+SKILLS
+Java, Spring Boot, SQL, REST APIs, Node.js, JavaScript
+
+EXPERIENCE
+Backend Engineer, Harbor Systems (2020 - Present)
+- Designed REST APIs serving over 1M requests/day using Java and Spring Boot.
+- Optimized SQL queries, reducing average response time by 30%.
+- Built internal tools with Node.js and JavaScript.
+
+PROJECTS
+- Built a small recommendation prototype using basic statistics (no formal
+  machine learning framework used).
+
+EDUCATION
+B.S. in Information Technology, Lakeview College, 2020

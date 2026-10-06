@@ -1,0 +1,23 @@
+SUMMARY
+Data scientist with 3 years of experience building machine learning models
+for e-commerce analytics.
+
+SKILLS
+Python, SQL, Machine Learning, Scikit-learn, Pandas, NumPy, Statistics,
+PyTorch, Docker
+
+EXPERIENCE
+Data Scientist, Northwind Analytics (2022 - Present)
+- Built churn-prediction models using scikit-learn and PyTorch, improving
+  retention campaign targeting by 18%.
+- Wrote Python and SQL pipelines to process customer transaction data.
+- Containerized model-serving services with Docker.
+
+Junior Data Analyst, Northwind Analytics (2021 - 2022)
+- Produced weekly SQL-based reporting dashboards for the marketing team.
+
+EDUCATION
+B.S. in Computer Science, State University, 2021
+
+CERTIFICATIONS
+AWS Certified Cloud Practitioner

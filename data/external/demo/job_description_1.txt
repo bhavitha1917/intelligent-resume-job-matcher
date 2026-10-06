@@ -1,0 +1,31 @@
+Data Scientist (Mid-Level)
+
+About the role:
+We are looking for a Data Scientist to join our analytics team. You will
+build predictive models, analyze large datasets, and communicate insights
+to stakeholders.
+
+Required skills:
+- Python
+- SQL
+- Machine Learning
+- Scikit-learn
+- Statistics
+
+Preferred skills:
+- PyTorch
+- AWS
+- Docker
+- Natural Language Processing
+
+Experience:
+- 2+ years of experience in a data science or analytics role.
+
+Education:
+- Bachelor's degree in Computer Science, Statistics, or a related field.
+
+Responsibilities:
+- Design and evaluate machine learning models for business problems.
+- Write production-quality Python and SQL code.
+- Collaborate with engineering to deploy models.
+- Communicate findings through clear visualizations and reports.

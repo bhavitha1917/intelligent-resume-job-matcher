@@ -1,0 +1,59 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+build/
+dist/
+
+# --- Virtual environment ---
+.venv/
+venv/
+env/
+
+# --- Environment / secrets ---
+.env
+*.pem
+*.key
+
+# --- Raw & processed datasets (never commit) ---
+data/raw/**
+!data/raw/.gitkeep
+data/processed/**
+!data/processed/.gitkeep
+data/external/**
+!data/external/demo/
+!data/external/demo/**
+!data/external/.gitkeep
+
+# --- Downloaded / cached models (sentence-transformers, HF cache) ---
+models/cache/
+.cache/
+*.bin
+*.safetensors
+*.onnx
+huggingface_hub_cache/
+sentence_transformers_cache/
+
+# --- Large trained artifacts that should be regenerated, not hand-edited ---
+# (small sklearn models / vectorizers / skill dict ARE kept; see models/README.md)
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Reports (generated, regenerable) ---
+# figures/results are kept as evidence of experiments; do not ignore reports/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Streamlit ---
+.streamlit/secrets.toml
+
+# --- pytest / coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
