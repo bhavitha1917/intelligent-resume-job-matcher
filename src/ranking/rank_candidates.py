@@ -13,10 +13,28 @@ from src.features.feature_engineering import build_feature_vector
 from src.matching.explainability import generate_explanation
 from src.matching.hybrid import compute_weighted_hybrid_score
 from src.matching.skill_gap import get_skill_gap
+from src.models.inference import load_final_model_artifacts, predict_match
 
 
 def _default_scorer(features: dict) -> float:
+    """Use the trained Random Forest (the final model selected in
+    src/models/train_supervised.py on validation performance) when its
+    artifacts are available; otherwise fall back to the transparent
+    weighted hybrid score so the app still works before training has run.
+    """
+    if load_final_model_artifacts() is not None:
+        return predict_match(features)["score_percent"] / 100.0
     return compute_weighted_hybrid_score(features)
+
+
+def _default_feature_importance() -> Optional[dict]:
+    artifacts = load_final_model_artifacts()
+    if artifacts is None:
+        return None
+    from src.models.inference import FEATURE_COLUMNS
+
+    model = artifacts["model"]
+    return dict(zip(FEATURE_COLUMNS, model.feature_importances_.tolist()))
 
 
 def rank_candidates(
@@ -41,6 +59,7 @@ def rank_candidates(
     """
     job_parsed = parse_job_description_text(job_description)
     score_fn = scorer or _default_scorer
+    feature_importance = _default_feature_importance() if scorer is None else None
 
     results = []
     for resume_entry in resumes:
@@ -69,6 +88,7 @@ def rank_candidates(
             features,
             match_score=overall_score,
             missing_required_skills=[item["skill"] for item in skill_gap["missing_required_skills"]],
+            feature_importance=feature_importance,
         )
 
         results.append({
