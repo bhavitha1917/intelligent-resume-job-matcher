@@ -39,8 +39,12 @@ Streamlit Cloud will:
 
 ## After deploying
 
-- First request may take 20-60 seconds (cold start + sentence-transformer
-  model download). Subsequent requests are fast.
+- First request may take anywhere from ~20 seconds to a few minutes (cold
+  start + sentence-transformer model download/load — during local testing
+  this varied significantly run-to-run, even with the model already
+  cached). Subsequent requests in the same running instance are fast.
+  If it consistently takes longer than a few minutes on Streamlit Cloud,
+  check the app logs for network errors reaching huggingface.co.
 - If you later re-run `python -m src.models.train_supervised` and commit new
   model artifacts, Streamlit Cloud redeploys automatically on push.
 - To update secrets (none required currently), use the app's **Settings →

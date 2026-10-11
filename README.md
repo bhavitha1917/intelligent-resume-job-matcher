@@ -280,8 +280,10 @@ streamlit run app/app.py
 Open http://localhost:8501. Use the "bundled demo" checkboxes on the
 **Single Resume Analysis** and **Candidate Ranking** pages to try the system
 without any dataset downloads. The first semantic-similarity call in a
-fresh session takes ~20-30 seconds while the sentence-transformer model
-loads into memory; subsequent calls are fast.
+fresh session loads the sentence-transformer model into memory and was
+observed to take anywhere from ~20 seconds to a few minutes across repeated
+local test runs (network- and disk-I/O-dependent, not a fixed cost);
+subsequent calls in the same session are fast (sub-second).
 
 ---
 

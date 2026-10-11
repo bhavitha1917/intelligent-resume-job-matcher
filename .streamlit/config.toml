@@ -5,7 +5,7 @@ primaryColor = "#4C72B0"
 [server]
 headless = true
 enableCORS = false
-enableXsrfSecurity = true
+enableXsrfProtection = true
 
 [browser]
 gatherUsageStats = false

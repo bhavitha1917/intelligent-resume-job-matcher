@@ -36,7 +36,7 @@ huggingface_hub_cache/
 sentence_transformers_cache/
 
 # --- Large trained artifacts that should be regenerated, not hand-edited ---
-# (small sklearn models / vectorizers / skill dict ARE kept; see models/README.md)
+# (small sklearn models / vectorizers / skill dict ARE kept; see README.md section 14)
 
 # --- Jupyter ---
 .ipynb_checkpoints/
