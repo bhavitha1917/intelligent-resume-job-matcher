@@ -1,0 +1,135 @@
+/* App styling layered on top of the Streamlit theme (.streamlit/config.toml).
+   Colours mirror the theme values; status is never conveyed by colour alone
+   (every chip keeps its icon and text label). */
+:root {
+  --lav-600: #6E62A8;
+  --lav-700: #4A3F85;
+  --lav-100: #EFEDF8;
+  --lav-50: #F7F6FC;
+  --blue-100: #EAF1F9;
+  --blue-500: #7C9CC4;
+  --ink: #24263A;
+  --muted: #5B5D72;
+  --line: #E3DFEE;
+  --card: #FFFFFF;
+  --shadow: 0 1px 2px rgba(36, 38, 58, 0.04), 0 2px 8px rgba(110, 98, 168, 0.06);
+  --ok-bg: #EAF3EC;  --ok-fg: #355E41;  --ok-line: #CFE2D4;
+  --warn-bg: #FBF2E2; --warn-fg: #7A4F10; --warn-line: #EED9B4;
+  --bad-bg: #F9E9ED; --bad-fg: #86303F; --bad-line: #EDC9D2;
+  --none-bg: #F1F1F5; --none-fg: #4A4C60; --none-line: #DEDEE6;
+}
+
+html, body, [class*="css"] { -webkit-text-size-adjust: 100%; }
+
+/* ---------- typography & spacing ---------- */
+.block-container { padding-top: 2.5rem; padding-bottom: 4rem; }
+h1 { letter-spacing: -0.01em; color: var(--ink); }
+h2, h3 { color: var(--ink); }
+h3 { margin-top: 1.2rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--line); }
+h4 { color: var(--lav-700); margin-top: 1.1rem; }
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color: var(--muted) !important; opacity: 1 !important; }
+hr { border-color: var(--line) !important; }
+
+/* ---------- sidebar ---------- */
+[data-testid="stSidebarNav"] a { border-radius: 0.5rem; margin: 0.05rem 0.25rem; }
+[data-testid="stSidebarNav"] a:hover { background: var(--lav-100); }
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+  background: var(--lav-100);
+  box-shadow: inset 3px 0 0 var(--lav-600);
+}
+[data-testid="stSidebarNav"] a[aria-current="page"] span { color: var(--lav-700); font-weight: 600; }
+
+/* ---------- cards: metrics, expanders, bordered containers ---------- */
+[data-testid="stMetric"] {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.8rem 1rem;
+  box-shadow: var(--shadow);
+}
+[data-testid="stMetricLabel"] { color: var(--muted); }
+[data-testid="stMetricValue"] { color: var(--lav-700); }
+
+[data-testid="stExpander"] details {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow);
+}
+[data-testid="stExpander"] summary:hover { background: var(--lav-50); }
+
+/* ---------- inputs ---------- */
+.stButton > button, .stDownloadButton > button { min-height: 44px; font-weight: 600; }
+.stButton > button[kind="secondary"], .stDownloadButton > button {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--lav-700);
+}
+.stButton > button[kind="secondary"]:hover, .stDownloadButton > button:hover {
+  border-color: var(--lav-600);
+  background: var(--lav-50);
+}
+[data-testid="stFileUploaderDropzone"] {
+  background: var(--lav-50);
+  border: 1.5px dashed #C9C2E3;
+  border-radius: 0.75rem;
+}
+[data-testid="stFileUploaderDropzone"]:hover { border-color: var(--lav-600); }
+[data-testid="stDataFrame"], [data-testid="stDataFrameResizable"] { border-radius: 0.6rem; }
+
+/* ---------- home intro ---------- */
+.hero {
+  background: linear-gradient(135deg, var(--lav-100) 0%, var(--blue-100) 100%);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1.4rem 1.5rem;
+  margin: 0.25rem 0 1.25rem 0;
+}
+.hero h1 { margin: 0 0 0.35rem 0; padding: 0; font-size: 2.1rem; }
+.hero p { margin: 0; color: var(--muted); font-size: 1.02rem; }
+
+/* ---------- report: requirements, evidence, status chips ---------- */
+.req-line { margin: 0.45rem 0 0.15rem 0; line-height: 1.5; overflow-wrap: anywhere; }
+.req-meta { color: var(--muted); font-size: 0.86rem; }
+.chip {
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  margin-right: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: 0.05em;
+}
+.chip-met { background: var(--ok-bg); color: var(--ok-fg); border-color: var(--ok-line); }
+.chip-partial { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-line); }
+.chip-not_detected { background: var(--none-bg); color: var(--none-fg); border-color: var(--none-line); }
+.chip-contradicted { background: var(--bad-bg); color: var(--bad-fg); border-color: var(--bad-line); }
+.evidence {
+  font-size: 0.92rem;
+  color: var(--muted);
+  margin: 0.2rem 0 0.35rem 1.1rem;
+  padding: 0.3rem 0.65rem;
+  border-left: 3px solid #D8D2EC;
+  background: var(--lav-50);
+  border-radius: 0 0.4rem 0.4rem 0;
+  overflow-wrap: anywhere;
+}
+.evidence.note { border-left-color: #E3CFA4; background: #FDF8EE; }
+.component-line { margin: 0.6rem 0 0.15rem 0; }
+.component-line b { color: var(--ink); }
+.component-points { color: var(--lav-700); font-weight: 700; }
+
+/* ---------- small screens (Android Chrome) ---------- */
+@media (max-width: 640px) {
+  .block-container { padding: 1rem 0.75rem 3rem 0.75rem !important; }
+  h1 { font-size: 1.6rem !important; }
+  h2 { font-size: 1.3rem !important; }
+  h3 { font-size: 1.1rem !important; }
+  .hero { padding: 1rem; }
+  .hero h1 { font-size: 1.5rem !important; }
+  .stButton > button, .stDownloadButton > button { width: 100%; }
+  [data-testid="stMetricValue"] { font-size: 1.6rem; }
+  .evidence { margin-left: 0.4rem; }
+}

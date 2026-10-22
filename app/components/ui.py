@@ -20,24 +20,7 @@ ICON_PATH = APP_DIR / "static" / "icon-192.png"
 UPLOAD_TYPES = [ext.lstrip(".") for ext in SUPPORTED_EXTENSIONS]
 STATUS_ICON = {"met": "✅", "partial": "🟡", "not_detected": "⚪", "contradicted": "⛔"}
 
-_MOBILE_CSS = """
-<style>
-/* Readable, touch-friendly layout on small screens (Android Chrome). */
-html, body, [class*="css"] { -webkit-text-size-adjust: 100%; }
-.stButton > button, .stDownloadButton > button { min-height: 44px; }
-.evidence { font-size: 0.92rem; color: var(--text-color); opacity: 0.85; margin: 0 0 0.35rem 1.4rem;
-            overflow-wrap: anywhere; }
-.req-line { margin: 0.15rem 0; overflow-wrap: anywhere; }
-@media (max-width: 640px) {
-  .block-container { padding: 1rem 0.75rem 3rem 0.75rem !important; }
-  h1 { font-size: 1.6rem !important; }
-  h2 { font-size: 1.3rem !important; }
-  h3 { font-size: 1.1rem !important; }
-  .stButton > button, .stDownloadButton > button { width: 100%; }
-  [data-testid="stMetricValue"] { font-size: 1.6rem; }
-}
-</style>
-"""
+STYLES_PATH = Path(__file__).resolve().parent / "styles.css"
 
 DECISION_SUPPORT_NOTE = (
     "Decision support only: scores summarise evidence found in resume text under a documented rubric. "
@@ -48,7 +31,11 @@ DECISION_SUPPORT_NOTE = (
 def setup_page(title: str, layout: str = "centered") -> None:
     st.set_page_config(page_title=f"{title} · Resume–Job Matching",
                        page_icon=str(ICON_PATH) if ICON_PATH.exists() else "🧭", layout=layout)
-    st.markdown(_MOBILE_CSS, unsafe_allow_html=True)
+    st.markdown(f"<style>{_stylesheet()}</style>", unsafe_allow_html=True)
+
+
+def _stylesheet() -> str:
+    return STYLES_PATH.read_text(encoding="utf-8")
 
 
 def semantic_setting() -> bool:
@@ -136,20 +123,25 @@ def _pct(x):
     return f"{x * 100:.0f}%"
 
 
+def _status_chip(status: str) -> str:
+    """Icon + text label in a tinted pill; the colour is only a secondary cue."""
+    return f"<span class='chip chip-{status}'>{STATUS_ICON[status]} {STATUS_SYMBOLS[status]}</span>"
+
+
 def _render_requirement(r: dict) -> None:
     res = r["result"]
     tags = [r["importance"]] + (["must-have"] if r["essential"] else [])
     level = f" · {res['evidence_level']}" if res.get("evidence_level") in ("applied", "listed") else ""
     st.markdown(
-        f"<div class='req-line'>{STATUS_ICON[res['status']]} <b>{r['label']}</b> "
-        f"<small>({', '.join(tags)}) — {STATUS_SYMBOLS[res['status']]}{level} · credit {res['credit']:.2f}</small></div>",
+        f"<div class='req-line'>{_status_chip(res['status'])}<b>{_escape(r['label'])}</b> "
+        f"<span class='req-meta'>({', '.join(tags)}){level} · credit {res['credit']:.2f}</span></div>",
         unsafe_allow_html=True,
     )
     for ev in res.get("evidence", [])[:2]:
         st.markdown(f"<div class='evidence'>“{_escape(ev['text'])}” <i>({ev['section']}, {ev['kind']})</i></div>",
                     unsafe_allow_html=True)
     for note in res.get("notes", []):
-        st.markdown(f"<div class='evidence'>ℹ️ {_escape(note)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='evidence note'>ℹ️ {_escape(note)}</div>", unsafe_allow_html=True)
 
 
 def _escape(text: str) -> str:
@@ -176,8 +168,9 @@ def render_report(report: dict, key: str, model_estimate: dict | None = None) ->
     st.markdown("#### How this score was calculated")
     applicable = [c for c in report["components"] if c["applicable"]]
     for c in applicable:
-        st.markdown(f"**{c['label']}** — value {_pct(c['value'])} × weight {c['effective_weight']:.2f} "
-                    f"= **{c['contribution']:.1f}** points")
+        st.markdown(f"<div class='component-line'><b>{c['label']}</b> — value {_pct(c['value'])} × weight "
+                    f"{c['effective_weight']:.2f} = <span class='component-points'>{c['contribution']:.1f} points</span>"
+                    f"</div>", unsafe_allow_html=True)
         st.progress(min(1.0, c["value"]))
     if applicable and report["status"] == "scored":
         total = sum(c["contribution"] for c in applicable)
@@ -227,14 +220,14 @@ def render_report(report: dict, key: str, model_estimate: dict | None = None) ->
         if not missing:
             st.write("Every listed requirement has supporting evidence.")
         for r in missing:
-            st.markdown(f"<div class='req-line'>{STATUS_ICON[r['result']['status']]} {r['label']} — "
-                        f"{STATUS_SYMBOLS[r['result']['status']]}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='req-line'>{_status_chip(r['result']['status'])}{_escape(r['label'])}</div>",
+                        unsafe_allow_html=True)
         st.caption("'Not detected' means the submitted resume text does not show it — not that the candidate "
                    "lacks it. 'Contradicted' means the resume itself states a lack.")
 
     with st.expander("Limitations and extraction warnings"):
         for w in report["warnings"]:
-            st.markdown(f"- {w}")
+            st.markdown(f"<div class='evidence note'>⚠️ {_escape(w)}</div>", unsafe_allow_html=True)
         removed = report["privacy"]["removed_before_scoring"]
         st.markdown(f"- Removed from scoring input: {', '.join(removed) if removed else 'no contact / personal fields detected'}.")
         st.markdown("- Skill detection uses a curated dictionary plus literal phrases from the job; synonyms "

@@ -7,7 +7,11 @@ from src.scoring.config import load_rubric
 setup_page("Home")
 rubric = load_rubric()
 
-st.title("Resume–Job Matching")
+st.markdown(
+    "<div class='hero'><h1>Resume–Job Matching</h1>"
+    "<p>Evidence-based comparison of resumes against a job description, with every score explained.</p></div>",
+    unsafe_allow_html=True,
+)
 st.caption(DECISION_SUPPORT_NOTE)
 
 st.markdown(

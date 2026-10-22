@@ -1,6 +1,44 @@
 [theme]
 base = "light"
-primaryColor = "#4C72B0"
+# Pastel palette: muted lavender primary, powder-blue secondary, navy text.
+# Status colours (green/orange/red/blue) are used by st.success / warning /
+# error / info, progress bars and badges. App-specific CSS lives in
+# app/components/styles.css and uses the same values.
+primaryColor = "#6E62A8"
+backgroundColor = "#FAF9FC"
+secondaryBackgroundColor = "#F2F0F8"
+textColor = "#24263A"
+linkColor = "#5A4E99"
+borderColor = "#E3DFEE"
+showWidgetBorder = true
+baseRadius = "0.6rem"
+buttonRadius = "0.6rem"
+dataframeBorderColor = "#E3DFEE"
+dataframeHeaderBackgroundColor = "#F2F0F8"
+dataframeHeaderTextColor = "#3A3560"
+headingFontWeights = [700, 650, 600]
+metricValueFontWeight = 650
+
+greenColor = "#5E8C6A"
+greenBackgroundColor = "#EAF3EC"
+greenTextColor = "#355E41"
+orangeColor = "#C08A3A"
+orangeBackgroundColor = "#FBF2E2"
+orangeTextColor = "#7A4F10"
+redColor = "#B5596B"
+redBackgroundColor = "#F9E9ED"
+redTextColor = "#86303F"
+blueColor = "#7C9CC4"
+blueBackgroundColor = "#EAF1F9"
+blueTextColor = "#34557C"
+violetColor = "#6E62A8"
+violetBackgroundColor = "#EFEDF8"
+violetTextColor = "#4A3F85"
+
+[theme.sidebar]
+backgroundColor = "#F3F1FA"
+secondaryBackgroundColor = "#FFFFFF"
+borderColor = "#E3DFEE"
 
 [server]
 headless = true
