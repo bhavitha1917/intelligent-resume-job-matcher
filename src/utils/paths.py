@@ -16,6 +16,8 @@ EXTERNAL_DATA_DIR = DATA_DIR / "external"
 DEMO_DATA_DIR = EXTERNAL_DATA_DIR / "demo"
 SKILLS_DIR = DATA_DIR / "skills"
 SKILL_DICTIONARY_PATH = SKILLS_DIR / "skill_dictionary.json"
+CONFIG_DIR = PROJECT_ROOT / "config"
+SCORING_RUBRIC_PATH = CONFIG_DIR / "scoring_rubric.json"
 
 RESUME_CSV_PATH = RAW_DATA_DIR / "Resume" / "Resume.csv"
 RESUME_PDF_ROOT = RAW_DATA_DIR / "data" / "data"
@@ -25,6 +27,8 @@ MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 RESULTS_DIR = REPORTS_DIR / "results"
+RESULTS_V2_DIR = RESULTS_DIR / "v2"
+MODELS_V2_DIR = MODELS_DIR / "v2"
 
 
 def require_path(path: Path, hint: str) -> Path:

@@ -6,6 +6,13 @@ primaryColor = "#4C72B0"
 headless = true
 enableCORS = false
 enableXsrfProtection = true
+# Resumes are small; a low limit protects the free-tier host.
+maxUploadSize = 10
+# Serves app/static/ (app icon) at /app/static/.
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"

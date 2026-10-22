@@ -6,6 +6,7 @@ datasets==5.1.0
 # Classical ML
 scikit-learn==1.9.1
 joblib==1.6.0
+scipy==1.17.1
 
 # Resume PDF parsing
 pymupdf==1.28.2

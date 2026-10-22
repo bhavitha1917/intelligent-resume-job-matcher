@@ -1,0 +1,53 @@
+{
+  "_comment": "Single source of truth for the transparent suitability rubric. Every number used by src/scoring/scorer.py comes from this file; see docs/SCORING.md for the rationale behind each value. Change values here, never in code. The SHA-256 fingerprint of this file is shown on every report so a score can be reproduced with exactly the same configuration.",
+  "version": "2.0.0",
+  "component_weights": {
+    "required_skills": 0.45,
+    "experience": 0.15,
+    "education": 0.10,
+    "certifications": 0.05,
+    "preferred_qualifications": 0.10,
+    "semantic_relevance": 0.15
+  },
+  "skill_evidence_credit": {
+    "applied": 1.0,
+    "listed": 0.75,
+    "contradicted": 0.0,
+    "not_detected": 0.0
+  },
+  "applied_evidence_sections": ["experience", "internships", "projects"],
+  "action_verbs": ["built", "developed", "designed", "implemented", "created", "deployed", "trained", "used", "using", "applied", "analyzed", "analysed", "automated", "engineered", "led", "managed", "delivered", "wrote", "programmed", "maintained", "optimized", "optimised", "conducted", "performed", "prepared", "administered", "coordinated", "migrated", "integrated", "launched", "taught", "handled", "build", "building", "develop", "developing", "design", "designing", "implement", "implementing", "create", "creating", "deploy", "deploying", "apply", "applying", "analyze", "analyzing", "analysing", "automate", "automating", "worked", "working", "manage", "managing", "leading", "teaching", "writing"],
+  "negation_window_tokens": 4,
+  "experience": {
+    "count_internships": true,
+    "count_only_relevant_entries": true,
+    "claimed_years_credit_factor": 1.0
+  },
+  "education": {
+    "unmatched_field_credit": 0.5,
+    "in_progress_credit": 0.5
+  },
+  "semantic_normalization": {
+    "_comment": "Raw cosine similarity of all-MiniLM-L6-v2 embeddings is rescaled linearly from [low, high] to [0, 1] and clipped. low/high are the 5th/95th percentiles of the similarity over all 2,383 de-duplicated dataset pairs (computed without using any labels; see reports/results/v2/semantic_bounds.json).",
+    "low": 0.23,
+    "high": 0.70
+  },
+  "essential_requirements": {
+    "min_credit_to_count_as_met": 0.75,
+    "min_required_skill_component_for_strong": 0.5,
+    "score_cap_when_unmet": 69.0
+  },
+  "bands": [
+    {"min_score": 70.0, "label": "Strong alignment"},
+    {"min_score": 45.0, "label": "Partial alignment"},
+    {"min_score": 0.0, "label": "Limited alignment"}
+  ],
+  "insufficient_evidence": {
+    "min_resume_words": 40,
+    "min_scorable_requirements": 1
+  },
+  "ranking": {
+    "score_decimals": 1,
+    "tie_rule": "Candidates whose overall scores are equal at the displayed precision share the same rank (standard competition ranking 1, 2, 2, 4). Within a tie, rows are listed alphabetically by file name for display only; this order carries no meaning."
+  }
+}

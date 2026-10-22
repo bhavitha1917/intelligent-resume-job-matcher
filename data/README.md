@@ -114,3 +114,17 @@ data/
 ├── external/demo/                    # tracked — tiny bundled sample for app/tests
 └── skills/skill_dictionary.json      # tracked — curated skill vocabulary
 ```
+
+---
+
+## Limitations of `batuhanmtl/job_resume_fit` (measured, see docs/EVALUATION.md)
+
+- 2,385 rows but only **23 distinct job descriptions**, one per category, so job and occupation are
+  confounded. Evaluation that should generalise to unseen jobs must therefore group by job
+  (leave-one-job-out).
+- `ai_match_score`, `skill_string_match_score` and `fuzzy_match_score` are produced by the dataset authors'
+  automated pipeline. **They are not recruiter decisions.** Metrics computed against them measure agreement
+  with that pipeline only.
+- 2 exact-duplicate resumes (dropped) and 12 near-duplicate resume pairs (TF-IDF cosine ≥ 0.95, all within
+  the same job).
+- Mean score differs strongly by job (≈ 19 for Engineering vs ≈ 80 for HR).

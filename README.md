@@ -1,386 +1,188 @@
-# Intelligent Resume–Job Matching, Candidate Ranking and Skill Gap Analysis using NLP
+# Intelligent Resume–Job Matching and Candidate Ranking (NLP)
 
-A decision-support NLP/ML system that scores how well a resume matches a job
-description, ranks multiple candidates, identifies matched/missing skills,
-and explains the score — built as a solo undergraduate semester project.
+An undergraduate NLP project that compares resumes with a job description and **explains** each result. It
+supports one resume against one job, many resumes ranked for the same job, and an evidence report per
+candidate. It runs as a Streamlit web app and works in Chrome on Android, which can add it to the home
+screen as a shortcut.
 
-**This system does not and must not make autonomous hiring decisions.** It
-is a candidate–job relevance and decision-support tool only.
-
----
-
-## 1. Problem statement
-
-Manually screening resumes against a job description is slow and
-inconsistent. Simple keyword matching is fast but brittle — it misses
-paraphrased skills ("built ML models" vs. "Machine Learning") and ignores
-context. This project investigates whether combining lexical similarity,
-semantic similarity, and engineered matching features — scored by a trained
-model — produces a meaningfully better candidate ranking than naive keyword
-matching, while remaining explainable and free of protected-attribute bias.
-
-## 2. Research question
-
-> Can combining lexical similarity, semantic similarity, skill matching, and
-> candidate-specific features improve resume–job matching and candidate
-> ranking compared with simple keyword-based matching?
-
-**Answer, with evidence (see §9 Results):** Yes. On the held-out test set,
-the keyword and TF-IDF baselines score F1(macro) ≈ 0.22 — barely better than
-predicting the majority class. Semantic similarity alone more than doubles
-that to F1 ≈ 0.42. A supervised Random Forest trained on the combined
-feature set reaches F1 ≈ 0.72 and ROC-AUC ≈ 0.89. The same ordering holds in
-ranking quality (MRR, NDCG@5) — see the **Model Comparison** page in the app
-or `reports/results/`.
-
-## 3. Objectives
-
-- Parse resumes (PDF/TXT) and job descriptions (raw text) robustly, degrading
-  gracefully on malformed input.
-- Extract skills deterministically via a curated, extensible dictionary.
-- Compare keyword, TF-IDF, and sentence-transformer semantic similarity as
-  successive baselines.
-- Engineer a leakage-safe feature set and train/compare classical ML models.
-- Produce a ranked candidate table, a skill-gap breakdown, and a
-  feature-grounded (non-fabricated) explanation for every score.
-- Ship all of the above as a working, locally runnable Streamlit app.
+> **Decision support only.** The score summarises evidence found in resume text under a documented rubric.
+> It is not a probability of being hired, not a model accuracy, and not a recruiter's judgment. It must
+> not be the sole basis for any hiring decision.
 
 ---
 
-## 4. Dataset sources
+## 1. What the app produces
 
-| Dataset | Source | Status |
+For every resume:
+
+- a **rubric alignment score (0–100)** and a band (Strong / Partial / Limited alignment, or *Insufficient
+  evidence* when there is too little to score);
+- the **component breakdown** (value × weight = points), so the score can be recomputed by hand;
+- every requirement with a status (✅ detected, 🟡 partial, ⚪ not detected, ⛔ contradicted), its credit, and
+  the **quoted resume text** that justified it;
+- experience entries (employment and internships, with durations), the detected degree, and projects with
+  the job skills they use;
+- missing or unverified items, extraction warnings, and what was removed for privacy;
+- the rubric version and config fingerprint, for reproducibility.
+
+The Candidate Ranking page scores every resume with **the same function and settings** as the single-resume
+page, ranks the candidates, reports unreadable and duplicate files instead of dropping them, and exports CSV.
+
+## 2. How the score works (summary)
+
+```
+uncapped = 100 × Σ wᶜ·vᶜ / Σ wᶜ   over components that apply to this job
+score    = min(uncapped, 69) if a must-have is not evidenced or required-skill evidence < 50 %
+```
+
+| Component | Weight |
+|---|---|
+| Required skills (applied 1.0 / listed 0.75 / contradicted or not detected 0) | 0.45 |
+| Experience: dated, relevant employment + internships vs. required years | 0.15 |
+| Education: degree level and field vs. requirement | 0.10 |
+| Required certifications | 0.05 |
+| Preferred qualifications | 0.10 |
+| Contextual relevance: sentence-transformer similarity, rescaled | 0.15 |
+
+The full definition, rationale and limitations are in **[docs/SCORING.md](docs/SCORING.md)**. All numbers
+live in [`config/scoring_rubric.json`](config/scoring_rubric.json).
+
+## 3. Architecture
+
+```
+Job description ──► requirement extraction ──► user review / edit (data editor)
+                                                     │
+Resume (PDF/DOCX/TXT) ──► parser + sections ──► privacy redaction
+                                                     │
+                                                     ▼
+                      src/scoring/scorer.py: score_candidate()   ◄── config/scoring_rubric.json
+                       │  skills: dictionary + literal phrases, negation, applied vs listed
+                       │  experience: date ranges, relevance, overlap merge
+                       │  education: degree level and field
+                       │  semantic: all-MiniLM-L6-v2 (frozen)
+                       ▼
+          report (score, components, evidence, warnings, fingerprint)
+            │                         │                        │
+   Single Resume page        Candidate Ranking page     CSV / Markdown export
+                                      │
+          (optional, collapsed) experimental v2 model estimate of the dataset label
+```
+
+| Path | Role |
+|---|---|
+| `src/scoring/` | `requirements.py`, `evidence.py`, `privacy.py`, `scorer.py`, `config.py`, `export.py` |
+| `src/skills/skill_extractor.py` | the single skill normaliser and matcher (training and inference) |
+| `src/data/resume_parser.py` | PDF (PyMuPDF), DOCX (standard library), TXT; section detection |
+| `src/ranking/rank_candidates.py` | batch scoring, duplicates and failures, tie rule |
+| `src/models/` | v2 training/evaluation (`train_supervised.py`), guarded inference (`inference.py`) |
+| `src/evaluation/legacy_v1.py` | reconstruction of the v1 features, used only for the old-vs-new comparison |
+| `app/` | Streamlit pages; `app/components/ui.py` is the shared report renderer |
+| `models/v2/` | current model artifacts and manifest; `models/*.joblib` = legacy v1, not loaded (see `models/README.md`) |
+| `reports/baseline/` | recorded behaviour of the originally deployed version |
+
+## 4. Data
+
+| Dataset | Use | In Git? |
 |---|---|---|
-| Kaggle Resume Dataset | https://www.kaggle.com/datasets/snehaanbhawal/resume-dataset | Present (`data/raw/Resume/Resume.csv`, 2,484 resumes, 24 categories) |
-| Kaggle LinkedIn Job Postings 2023-2024 | https://www.kaggle.com/datasets/arshkon/linkedin-job-postings-2023-2024 | **Not downloaded.** Job-side analysis currently uses the HF dataset's `job_text` field instead (documented substitution, see `data/README.md`). |
-| HF `batuhanmtl/job_resume_fit` | https://huggingface.co/datasets/batuhanmtl/job_resume_fit | Loaded automatically via `datasets.load_dataset` (2,385 paired resume/job rows) |
+| HF `batuhanmtl/job_resume_fit` (2,385 pairs, **23 distinct jobs**) | training and evaluation of the experimental models; label-free calibration of the semantic rescaling | no (downloaded automatically) |
+| Kaggle Resume Dataset | EDA (`notebooks/`) | no |
+| `data/external/demo/` | 1 job description + 3 synthetic resumes for demos and tests | yes |
 
-`ai_match_score`, `skill_string_match_score`, and `fuzzy_match_score` in the
-HF dataset are **dataset-provided matching signals, not human recruiter
-decisions**. They are treated as such throughout this project.
+The dataset's `ai_match_score` is generated by the dataset authors' automated pipeline. **It is not a
+recruiter decision,** and nothing in this project claims to have learned real hiring suitability from it.
+See [data/README.md](data/README.md).
 
-## 5. Dataset setup
+## 5. Evaluation (summary)
 
-Raw datasets are **not** committed to Git (see `.gitignore`). Full download
-and expected-path instructions: [`data/README.md`](data/README.md). A tiny,
-synthetic demo set (`data/external/demo/`) is bundled and tracked in Git so
-the app and tests run without downloading anything.
+Full details and tables: **[docs/EVALUATION.md](docs/EVALUATION.md)**. Key measured facts:
 
----
+- The v1 training features had skill coverage 0 for **92.9 %** of rows; v2 brings that to **10.0 %**.
+- The v1 headline (Random Forest macro-F1 0.72) used a row-level split, in which all 23 jobs appear in both
+  train and test. A baseline that only knows *which job* a row belongs to already reaches 0.65. On unseen
+  jobs (leave-one-job-out), v1 features reach 0.66 and v2 features 0.60.
+- Ranking within each job, scored against the dataset label: the rubric gets NDCG@10 **0.64** (random 0.38;
+  v1 skill matching 0.41). TF-IDF (0.76) and a v2 Logistic Regression (0.77) agree more closely with the
+  dataset's algorithmic label. The rubric is kept as the product score because it is explainable and the
+  label is not ground truth.
+- No human-labelled relevance set exists, so none of these numbers validate real-world suitability.
 
-## 6. Folder structure
-
-```
-.
-├── spec.md                     Full project specification (authoritative)
-├── README.md                   This file
-├── requirements.txt
-├── .gitignore / .env.example
-│
-├── data/
-│   ├── raw/                    gitignored — place downloaded datasets here
-│   ├── processed/               gitignored — pipeline-generated data
-│   ├── external/demo/           tracked — tiny bundled sample resumes/JD
-│   ├── skills/skill_dictionary.json   tracked — curated skill vocabulary
-│   └── README.md                dataset download/setup instructions
-│
-├── notebooks/                  reproducible EDA scripts (percent-script style)
-│   ├── 01_eda_resume_dataset.py
-│   └── 02_eda_resume_job_fit_dataset.py
-│
-├── src/
-│   ├── data/                   resume_parser.py, job_parser.py
-│   ├── preprocessing/          text_cleaning.py
-│   ├── skills/                 skill_extractor.py
-│   ├── matching/                keyword_baseline.py, tfidf_similarity.py,
-│   │                            semantic_similarity.py, hybrid.py,
-│   │                            skill_gap.py, explainability.py
-│   ├── features/               feature_engineering.py
-│   ├── models/                 config.py, train_supervised.py, inference.py
-│   ├── ranking/                rank_candidates.py
-│   ├── evaluation/             ranking_metrics.py
-│   └── utils/                  paths.py (no hardcoded absolute paths anywhere)
-│
-├── models/                     trained artifacts (TF-IDF vectorizer, scaler,
-│                                LogReg/RF/SVM/regressor, training_config.json)
-├── reports/
-│   ├── figures/                EDA + evaluation plots, app screenshots
-│   └── results/                JSON: EDA summaries, model/ranking comparison
-│
-├── app/                        Streamlit application (6 pages)
-├── tests/                      pytest unit tests (44 tests)
-└── conftest.py                 makes `src` importable from tests
-```
-
----
-
-## 7. System architecture
-
-```
-Resume (PDF/TXT)              Job description (text)
-      │                              │
-      ▼                              ▼
-  Resume parser                 Job parser
-      │                              │
-      └─────────────┬────────────────┘
-                     ▼
-            Skill extraction (curated dictionary)
-                     │
-                     ▼
-     Keyword coverage · TF-IDF similarity · Semantic similarity
-                     │
-                     ▼
-            Feature engineering (no PII, no protected attributes)
-                     │
-                     ▼
-   Trained supervised model (Random Forest) ──or── transparent hybrid score
-                     │
-                     ▼
-        Match score · Ranking · Skill gap · Explanation
-```
-
-## 8. Methodology
-
-**Preprocessing** (`src/preprocessing/text_cleaning.py`): Unicode/whitespace
-normalization and HTML stripping, deliberately **without** removing
-punctuation — `C++`, `C#`, `.NET`, `Node.js` must survive.
-
-**Skill extraction** (`src/skills/skill_extractor.py`): deterministic,
-dictionary-based, word-boundary-aware regex matching over
-`data/skills/skill_dictionary.json` (canonical names + aliases, e.g.
-`ML` → `Machine Learning`). No ML model — fully testable, no negation
-handling (documented limitation).
-
-**Matching methods compared:**
-1. **Keyword baseline** — skill coverage = matched / total required skills.
-2. **TF-IDF + cosine similarity** — vectorizer fit only on the training split.
-3. **Sentence-Transformer** (`all-MiniLM-L6-v2`, frozen, never fine-tuned) —
-   cosine similarity between embeddings.
-4. **Supervised models** — Logistic Regression, Random Forest, SVM trained
-   on 9 engineered features (no PII, no protected attributes).
-5. **Final hybrid** — a transparent, documented weighted combination
-   (`src/matching/hybrid.py`, weights in that file, not hidden).
-
-**Target definition** (`src/models/config.py`): `ai_match_score` (0–100) is
-bucketed into `weak` / `moderate` / `strong` at configurable thresholds
-(70 / 40). A secondary regression experiment predicts the continuous score
-directly (R² ≈ 0.76 on held-out test data).
-
-**Leakage prevention:** exact-duplicate resumes dropped before splitting;
-TF-IDF vectorizer and feature scaler fit **only** on the training split;
-sentence-transformer embeddings come from a frozen pretrained model (not fit
-on this data), so precomputing them for all splits does not leak target
-information. Full training pipeline: `src/models/train_supervised.py`.
-
-## 9. Models and evaluation
-
-70/15/15 train/val/test split (stratified), random seed 42. Test set: 358
-pairs.
-
-| Method | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) | ROC-AUC (macro, OvR) |
-|---|---|---|---|---|---|
-| 1. Keyword baseline | 0.494 | 0.165 | 0.333 | 0.221 | — |
-| 2. TF-IDF baseline | 0.494 | 0.165 | 0.333 | 0.221 | — |
-| 3. Semantic baseline | 0.492 | 0.534 | 0.446 | 0.422 | — |
-| 4. Logistic Regression | 0.698 | 0.670 | 0.696 | 0.679 | 0.876 |
-| 5. **Random Forest (final)** | **0.732** | **0.721** | **0.718** | **0.717** | **0.893** |
-| 6. SVM | 0.710 | 0.702 | 0.704 | 0.700 | 0.892 |
-| 7. Final hybrid (manual weights) | 0.508 | 0.297 | 0.349 | 0.257 | — |
-
-Ranking evaluation (synthetic multi-candidate queries, true pair + 9 sampled
-distractors per test job, Precision/Recall/NDCG@5, 358 queries):
-
-| Method | Precision@5 | Recall@5 | MRR | NDCG@5 |
-|---|---|---|---|---|
-| Keyword baseline | 0.007 | 0.034 | 0.060 | 0.018 |
-| Semantic baseline | 0.098 | 0.492 | 0.400 | 0.422 |
-| Final hybrid (manual weights) | 0.097 | 0.486 | 0.371 | 0.397 |
-| **Random Forest (final)** | **0.100** | **0.500** | **0.403** | **0.427** |
-
-**Model selection:** Random Forest was selected as the final model because
-it has the best F1/ROC-AUC on held-out data among all supervised models and
-the best ranking metrics overall, with acceptable inference latency (~0.1ms
-per pair). This was an experimental choice, not an assumption — see
-`reports/results/model_comparison.json`.
-
-**Notable finding:** the manually-weighted hybrid baseline performs *worse*
-on the fixed-threshold classification task than semantic similarity alone,
-even though its *ranking* quality is close to the learned model. This shows
-that hand-picked weights don't automatically produce well-calibrated
-absolute scores, even when they preserve a reasonable relative ordering —
-a genuine, documented argument for preferring the learned model over the
-manual hybrid as the final scorer (full discussion in the app's
-**Model Comparison** page).
-
-## 10. Results — EDA highlights
-
-- Resume dataset: 2,484 resumes, 24 categories, 2 exact duplicates, mean
-  length ≈ 811 words. **37.6% of resumes have zero skills detected** by the
-  (currently tech-skewed) skill dictionary — expected, since the dataset
-  spans non-technical categories (CHEF, TEACHER, AVIATION, ...) that the
-  current dictionary doesn't cover; documented limitation, easy to extend.
-- HF fit dataset: 2,385 pairs, 23 categories, `ai_match_score` mean ≈ 44,
-  std ≈ 25; correlation between `ai_match_score` and `fuzzy_match_score` ≈
-  0.63 (moderate agreement between the dataset's own scoring signals).
-
-Full figures: `reports/figures/`. Full numeric summaries:
-`reports/results/resume_eda_summary.json`,
-`reports/results/resume_job_fit_eda_summary.json`.
-
-## 11. Screenshots
-
-| Home | Candidate Ranking | Model Comparison |
-|---|---|---|
-| ![Home](reports/figures/app_screenshots/home_page.jpg) | ![Ranking](reports/figures/app_screenshots/candidate_ranking.jpg) | ![Model Comparison](reports/figures/app_screenshots/model_comparison.jpg) |
-
-Captured from a locally running instance (`streamlit run app/app.py`),
-verified end-to-end with the bundled demo data.
-
----
-
-## 12. Local setup
+## 6. Setup and local run
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # macOS/Linux
+.venv\Scripts\activate             # Windows   (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
+streamlit run app/app.py           # http://localhost:8501
 ```
 
-## 13. Running tests
+Try it without any files: on **Single Resume Analysis** choose *Demo job* and *Demo resume*; on **Candidate
+Ranking** choose *Demo job* and switch on *Use the 3 bundled demo resumes*. The first semantic-similarity
+call downloads `all-MiniLM-L6-v2` (~90 MB) and can take from ~20 s to a few minutes. The sidebar toggle
+switches that component off for every page.
+
+## 7. Tests
 
 ```bash
-python -m pytest tests/ -q
+python -m pytest -q
 ```
-44 tests covering preprocessing, skill extraction, resume/job parsing
-(including malformed-input handling), keyword/TF-IDF/hybrid matching,
-skill-gap wording, explainability, ranking, ranking metrics, and model
-config thresholds.
 
-## 14. Training the models
+95 tests (run 2026-10-22: **95 passed**). They cover reproducibility; recomputing the score from its
+components; training-vs-inference skill normalisation; required-skill coverage; duplicate mentions;
+aliases and substring false positives (`R`, `Java`/`JavaScript`, `ML`/`ml`, `Scrum Master`); not detected vs
+contradicted; quoted requirements; malformed, empty and DOCX files; the experience, internship, project
+and education rules; must-have capping; single-page vs ranking-page agreement (both through the functions
+and through the real Streamlit pages via `streamlit.testing`); ties; CSV export; privacy redaction;
+class-probability ordering; refusal of incompatible model artifacts; and wording that must never present
+the score as an accuracy or a match percentage. The audit's regression feature vector is used in
+`tests/test_inference.py`.
 
-Requires the HF dataset (downloaded automatically) and an internet
-connection the first time (to fetch `all-MiniLM-L6-v2` and the dataset).
+## 8. Retraining and reproducing the evaluation
 
 ```bash
-python notebooks/01_eda_resume_dataset.py
-python notebooks/02_eda_resume_job_fit_dataset.py
 python -m src.models.train_supervised
 ```
 
-This regenerates `models/*.joblib`, `models/training_config.json`,
-`reports/figures/*.png`, and `reports/results/*.json`.
+This downloads the HF dataset, scores every pair with the same `score_candidate` the app uses, runs both
+evaluation protocols, writes `reports/results/v2/evaluation.json` and `reports/figures/v2/`, and refits
+`models/v2/*` with `manifest.json`. Embeddings are cached in `data/processed/` (gitignored). The run took
+~25 min on a laptop CPU. The recorded behaviour of the original version is in `reports/baseline/`
+(`record_baseline.py` must be run on the `baseline-v1-deployed` tag to regenerate it).
 
-## 15. Running the Streamlit app
+## 9. Privacy and fairness
 
-```bash
-streamlit run app/app.py
-```
+- Before any scoring step, e-mail, phone numbers, URLs, the personal-details section, and lines stating
+  date of birth, age, gender, marital status, nationality, religion, caste, family names, ID numbers or
+  address are blanked. A test checks that these never reach the scorer or the semantic model, and that
+  adding them does not change the score.
+- No protected attribute is used or inferred. Names are not removed from the text, but are never features.
+- Uploaded files are processed in memory for the session, and the app does not save or log them. Exports
+  contain scores and short evidence quotes, not full resumes or contact details.
+- Excluding protected fields does **not** make the system bias-free. Wording style, institutions, career
+  gaps and the dictionary's uneven coverage of professions can still correlate with protected
+  characteristics. Human review is required.
+- Never commit real resumes, datasets, `.env` or `.streamlit/secrets.toml` (all gitignored).
 
-Open http://localhost:8501. Use the "bundled demo" checkboxes on the
-**Single Resume Analysis** and **Candidate Ranking** pages to try the system
-without any dataset downloads. The first semantic-similarity call in a
-fresh session loads the sentence-transformer model into memory and was
-observed to take anywhere from ~20 seconds to a few minutes across repeated
-local test runs (network- and disk-I/O-dependent, not a fixed cost);
-subsequent calls in the same session are fast (sub-second).
+## 10. Android
 
----
+Open the deployed URL in Chrome on Android. The pages stack into one column, with full-width buttons and
+expandable report sections. Use **⋮ → Add to Home screen** to get a shortcut icon. This is a browser
+shortcut, **not** an installable PWA or native app, and it does not work offline: Streamlit does not let
+an app register a web manifest or service worker at the site root (details in
+[deployment/streamlit_cloud.md](deployment/streamlit_cloud.md)).
 
-## 16. Deployment
+## 11. Deployment and rollback
 
-**Target:** Streamlit Community Cloud via GitHub.
+Production deploys `main` → `app/app.py` on Streamlit Community Cloud. This version is on the branch
+`improve/transparent-scoring`. The previously deployed commit is tagged `baseline-v1-deployed`. Review,
+promote and roll back as described in **[deployment/streamlit_cloud.md](deployment/streamlit_cloud.md)**.
 
-**Status: not deployed from this environment** — deployment requires
-connecting a GitHub repository to a Streamlit Cloud account, which needs
-interactive browser authentication this environment doesn't have. The
-repository is deployment-ready (see verification below); deploying is a
-~2-minute manual step for whoever owns the GitHub/Streamlit Cloud account.
+## 12. Known limitations
 
-**To deploy once the repo is pushed to GitHub:**
-1. Go to https://share.streamlit.io and sign in with GitHub.
-2. "New app" → select this repository and branch.
-3. Main file path: `app/app.py`.
-4. Deploy. Streamlit Cloud installs `requirements.txt` automatically and
-   downloads `all-MiniLM-L6-v2` on first use (cached afterward).
-5. The trained model artifacts under `models/` are committed to the repo, so
-   the deployed app loads them directly — **it never retrains**.
-
-**Pre-deployment checklist (verified):**
-- [x] `app/app.py` is a valid Streamlit entry point with 5 pages under `app/pages/`.
-- [x] `requirements.txt` lists only directly-used, version-pinned packages.
-- [x] No hardcoded absolute paths anywhere (`src/utils/paths.py` resolves
-      everything relative to the repo root).
-- [x] Raw datasets are not required at runtime (app works on demo data).
-- [x] Trained artifacts (`models/*.joblib`) are committed, not retrained at
-      deploy time.
-- [x] `all-MiniLM-L6-v2` is downloaded/cached by `sentence-transformers` at
-      runtime, not bundled into Git.
-- [x] No secrets committed (`.env.example` documents that none are
-      currently required).
-- [x] `.gitignore` excludes raw data, caches, and the virtual environment.
-
-## 17. Limitations
-
-- Skill dictionary is tech/data-role-biased (see §10 EDA finding).
-- Dictionary-based skill extraction has no negation handling (e.g. "no
-  formal machine learning experience" still registers "Machine Learning" —
-  observed directly during manual testing; see `app/pages/5_Methodology.py`).
-- LinkedIn Job Postings dataset not yet downloaded; job-side analysis
-  currently substitutes the HF dataset's `job_text` field.
-- `ai_match_score` reflects the HF dataset's own generation pipeline, not
-  verified recruiter outcomes — every downstream metric inherits this.
-- Ranking evaluation uses synthetically constructed multi-candidate queries
-  (true pair + random distractors), not a dataset-native ranking ground
-  truth — a documented methodological choice, not a hidden one.
-- Resume datasets are not a representative sample of the real labor market;
-  results should not be assumed to generalize across industries, regions,
-  or demographic groups.
-
-## 18. Ethical considerations
-
-- No protected attribute (name, gender, age, photo, email, phone, address,
-  religion, caste, nationality, marital status) is used as a model feature
-  — enforced by construction: features are derived only from resume/job
-  **text content** (`src/features/feature_engineering.py`).
-- "Missing" a skill is always reported as *"Not detected in submitted
-  resume"* (`src/matching/skill_gap.py`), never a claim that the candidate
-  lacks the skill.
-- The app's Home page states explicitly that this is a decision-support
-  tool, not an autonomous hiring system, and that dataset matching scores
-  are not verified human decisions.
-
-## 19. Future work
-
-- Download and integrate the LinkedIn Job Postings dataset for native
-  job-side EDA and a larger, more diverse required-skills vocabulary.
-- Expand `skill_dictionary.json` to cover non-technical categories present
-  in the Kaggle Resume Dataset (currently ~38% zero-skill coverage there).
-- Add negation-aware skill extraction (e.g. a small dependency-parse or
-  regex-based negation window around matched skill phrases).
-- Hyperparameter tuning (grid/random search) for the supervised models, and
-  possibly an XGBoost comparison.
-- A calibrated version of the manual hybrid score (e.g. per-feature
-  min-max calibration) to close the gap with the learned model.
-- Deploy to Streamlit Community Cloud once connected to a GitHub account.
-
----
-
-## Deliverables checklist (spec.md section 38)
-
-| # | Deliverable | Status |
-|---|---|---|
-| 1 | `spec.md` | present |
-| 2 | source code | `src/`, `app/` |
-| 3 | notebooks | `notebooks/` (reproducible EDA scripts) |
-| 4 | preprocessing pipeline | `src/preprocessing/`, `src/data/` |
-| 5 | trained models | `models/*.joblib` |
-| 6 | evaluation results | `reports/results/*.json` |
-| 7 | figures | `reports/figures/*.png`, screenshots |
-| 8 | Streamlit application | `app/` (verified working end-to-end) |
-| 9 | README | this file |
-| 10 | requirements.txt | present, pinned |
-| 11 | tests | `tests/` (44 passing) |
-| 12 | deployment configuration | §16, verified ready |
-| 13 | GitHub repository | local repo initialized, clean `.gitignore` |
-| 14 | deployed application URL | **not deployed** — requires manual GitHub/Streamlit Cloud auth (§16) |
+- Rule-based parsing and extraction: complex PDF layouts, tables and scanned documents (no OCR) can
+  degrade results. Extracted requirements should always be reviewed.
+- Negation is detected only from short preceding cues. Synonyms outside the ~230-entry dictionary are only
+  partly covered by the semantic component.
+- Rubric weights are an initial documented judgment, not validated against human reviewers.
+- The evaluation data has algorithmic labels and 23 jobs; generalisation claims are weak.
+- Future work: a human-reviewed relevance set (see docs/EVALUATION.md), OCR, a broader skill vocabulary,
+  and weight sensitivity analysis against that set.

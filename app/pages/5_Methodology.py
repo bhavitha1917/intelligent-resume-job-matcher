@@ -1,106 +1,98 @@
 import _bootstrap  # noqa: F401
+import pandas as pd
 import streamlit as st
+from components.ui import setup_page
 
-st.set_page_config(page_title="Methodology", page_icon="🧭", layout="wide")
-st.title("Methodology / About")
+from src.scoring.config import load_rubric
+from src.scoring.scorer import COMPONENT_LABELS, INTERPRETATION
 
-st.markdown(
-    """
-## Datasets
+setup_page("Methodology")
+st.title("Methodology")
+rubric = load_rubric()
 
-1. **Kaggle Resume Dataset** (`data/raw/Resume/Resume.csv`) — 2,484 resumes
-   across 24 professional categories. Used for resume-side EDA, parsing
-   validation, and the bundled demo examples.
-2. **Kaggle LinkedIn Job Postings 2023-2024** — specified by the project
-   brief but **not downloaded** in this environment (see `data/README.md`).
-   Job-side analysis currently falls back to the Hugging Face dataset's
-   `job_text` field instead.
-3. **Hugging Face `batuhanmtl/job_resume_fit`** — 2,385 paired resume/job
-   examples with dataset-provided matching signals
-   (`ai_match_score`, `skill_string_match_score`, `fuzzy_match_score`).
-   **These are not human recruiter decisions** — they are the dataset's
-   own generated signals, used here only to supervise a classifier.
+st.markdown("## What the score means")
+st.info(INTERPRETATION)
 
-## Preprocessing
+st.markdown("## The scoring rubric")
+st.caption(f"Rubric v{rubric['version']} · fingerprint `{rubric['_fingerprint']}` · source: `config/scoring_rubric.json`")
+st.dataframe(pd.DataFrame([{"Component": COMPONENT_LABELS[k], "Weight": w,
+                            "Applies when the job states…": {
+                                "required_skills": "at least one required skill",
+                                "experience": "a minimum number of years",
+                                "education": "a required degree level",
+                                "certifications": "a required certification",
+                                "preferred_qualifications": "any preferred item",
+                                "semantic_relevance": "always (if the model is enabled)",
+                            }[k]} for k, w in rubric["component_weights"].items()]),
+             hide_index=True, width="stretch")
 
-Unicode/whitespace normalization and HTML stripping, deliberately **without**
-removing punctuation — technical tokens like `C++`, `C#`, `.NET`, `Node.js`
-must survive cleaning (`src/preprocessing/text_cleaning.py`).
+cap = rubric["essential_requirements"]
+credit = rubric["skill_evidence_credit"]
+st.markdown(f"""
+**Aggregation**
 
-## Skill extraction
+`uncapped = 100 × Σ (wᶜ × vᶜ) / Σ wᶜ` over *applicable* components only (weights renormalised), each value vᶜ ∈ [0, 1].
 
-A curated JSON dictionary (`data/skills/skill_dictionary.json`) with
-canonical names and aliases (e.g. `ML` → `Machine Learning`), matched with
-word-boundary-aware regex that correctly handles punctuation-containing
-terms (`src/skills/skill_extractor.py`). This is deterministic and
-testable — not an ML-based extractor — and it is a documented limitation
-that it has no notion of negation (e.g. "no formal machine learning
-experience" still contains the phrase "machine learning").
+`score = min(uncapped, {cap['score_cap_when_unmet']:.0f})` if a **must-have** requirement is not evidenced, or required-skill
+evidence is below {cap['min_required_skill_component_for_strong']:.0%}; otherwise `score = uncapped`.
+Bands: {", ".join(f"≥ {b['min_score']:.0f} {b['label']}" for b in rubric['bands'])}.
 
-## Matching methods compared
+**Component values**
 
-1. **Keyword baseline** — skill coverage = matched required skills / total required skills.
-2. **TF-IDF + cosine similarity** — vectorizer fit only on the training split.
-3. **Sentence-Transformer semantic similarity** — `all-MiniLM-L6-v2`, pretrained and
-   frozen (never fine-tuned), embeddings cached, cosine similarity between resume and job.
-4. **Supervised models** — Logistic Regression, Random Forest, SVM, trained
-   on engineered features (skill coverage, TF-IDF similarity, semantic
-   similarity, resume/job length, experience/education compatibility — no
-   PII, no protected attributes).
-5. **Final hybrid** — a transparent, documented weighted combination
-   (`src/matching/hybrid.py`) compared against the learned model.
+- *Required skills / certifications*: mean credit per requirement. A skill is **applied** ({credit['applied']}) when it appears
+  in an experience, internship or project section or next to an action verb ("built", "deployed" …), **listed**
+  ({credit['listed']}) when it only appears in a skills list or summary, **contradicted** ({credit['contradicted']}) when the
+  resume negates it ("no experience with X"), **not detected** ({credit['not_detected']}) otherwise. Each requirement counts
+  once, however many times it is mentioned.
+- *Experience*: dated employment and internship entries that mention a job skill or title word are merged (overlaps counted
+  once); value = min(1, detected years / required years). Stated-but-undated years ("5 years of experience") are used only
+  when no dated entry exists, and are flagged.
+- *Education*: 1.0 if the highest detected degree meets the level and field; ×{rubric['education']['unmatched_field_credit']}
+  if the field is not recognised; ×{rubric['education']['in_progress_credit']} if in progress; 0 if below the level or not detected.
+- *Preferred qualifications*: mean credit over all preferred items of any kind.
+- *Contextual relevance*: cosine similarity of `all-MiniLM-L6-v2` embeddings of the (PII-redacted) resume and the job,
+  rescaled linearly from [{rubric['semantic_normalization']['low']}, {rubric['semantic_normalization']['high']}] to [0, 1]
+  (5th/95th percentiles over the dataset, computed without labels).
 
-See the **Model Comparison** page for the actual experimental numbers and
-why Random Forest was selected as the final model.
+**Insufficient evidence**: no score is shown if fewer than {rubric['insufficient_evidence']['min_resume_words']} words of
+resume text are usable or the job has no scorable requirement.
 
-## Target definition (spec.md section 18)
+**Why these weights?** They are a documented initial judgment, not fitted to the dataset labels: explicit required skills
+carry the most weight because they are what the job states it needs; experience and education are standard screening criteria
+but are extracted less reliably; semantic similarity is limited to {rubric['component_weights']['semantic_relevance']:.0%} so
+generic text overlap cannot outweigh missing requirements. See `docs/SCORING.md` for the full rationale and limitations.
+""")
 
-`ai_match_score` (0-100) is bucketed into `weak` / `moderate` / `strong`
-using documented, configurable thresholds in `src/models/config.py`
-(`STRONG_MATCH_THRESHOLD = 70`, `MODERATE_MATCH_THRESHOLD = 40`). A secondary
-regression experiment predicts the continuous score directly.
+st.markdown("""
+## Pipeline
 
-## Leakage prevention (spec.md section 28)
+1. **Parsing** — PDF (PyMuPDF), DOCX (standard-library XML reader) and TXT. Scanned PDFs are not OCR'd. Sections are
+   detected from header lines (or inline headers for single-line text).
+2. **Privacy** — e-mail, phone numbers, URLs, and lines stating date of birth, age, gender, marital status, nationality,
+   religion, caste, family names, IDs or address are blanked before any scoring step. Names are not removed from the text
+   but are never used as features.
+3. **Requirements** — extracted from "Requirements / Preferred / Must have" sections; you review and edit them before
+   scoring. Skills use a curated dictionary of ~230 skills and certifications with aliases (ambiguous abbreviations
+   such as "ML", "CV", "TS" must appear in capitals), plus literal phrases for anything not in the dictionary.
+4. **Evidence** — every requirement gets a status (detected / partial / not detected / contradicted), a credit and the
+   resume text that justified it.
+5. **Score** — the rubric above. Single-resume and ranking pages call the same function.
 
-- Exact-duplicate resumes are dropped before splitting.
-- The TF-IDF vectorizer and feature scaler are fit **only** on the training split.
-- Sentence-transformer embeddings come from a frozen pretrained model (not
-  fit on this dataset), so precomputing them for all splits does not leak
-  target information.
+## Data and evaluation
 
-## Evaluation
+The Hugging Face `batuhanmtl/job_resume_fit` dataset (2,385 pairs) has **only 23 distinct job descriptions**, and its
+`ai_match_score` is generated by the dataset authors' automated pipeline — not by recruiters. The learned models are
+therefore evaluated with **leave-one-job-out** cross-validation, and are shown only as an experimental diagnostic. See the
+**Evaluation** page for measured results and their limits. No human-labelled relevance set exists for this project; building
+one is the necessary next step before any claim about real-world ranking quality.
 
-Classification metrics (accuracy, precision/recall/F1 macro, ROC-AUC
-one-vs-rest) plus ranking metrics (Precision@K, Recall@K, MRR, NDCG@K) on a
-synthetic multi-candidate ranking task constructed from the test split
-(true pair + 9 sampled distractors per query) — see
-`src/evaluation/ranking_metrics.py` and
-`reports/results/ranking_evaluation.json`.
+## Known limitations
 
-## Limitations
-
-- The skill dictionary is biased toward technical/data roles; ~38% of the
-  Kaggle resume corpus (which spans categories like CHEF, TEACHER,
-  AVIATION) has zero detected skills under it — see
-  `reports/results/resume_eda_summary.json`.
-- Dictionary-based skill extraction has no negation handling.
-- The job-posting side of the pipeline currently substitutes the HF
-  dataset's `job_text` field for the (not yet downloaded) LinkedIn
-  postings dataset.
-- `ai_match_score` reflects the HF dataset's own generation pipeline, not
-  verified recruiter outcomes — all downstream metrics inherit that
-  limitation.
-- Resume datasets are not a representative sample of the real labor
-  market or candidate population; results should not be assumed to
-  generalize across industries, regions, or demographic groups.
-
-## Ethical considerations
-
-- No protected attribute (name, gender, age, photo, email, phone, address,
-  religion, caste, nationality, marital status) is used as a model feature.
-- The system is a **decision-support tool**. It does not and must not make
-  autonomous hiring decisions.
-- "Missing" a skill is always reported as *"Not detected in submitted
-  resume"* rather than a claim that the candidate lacks that skill.
-"""
-)
+- Rule-based extraction: unusual resume layouts, tables and multi-column PDFs can be mis-sectioned.
+- Negation handling covers short preceding cues only; synonyms outside the dictionary are only partly captured by the
+  semantic component.
+- Experience durations use month/year ranges; year-only ranges are counted from January; "Present" is the analysis date.
+- Excluding protected attributes does not make the system bias-free: wording, school names, career gaps and the
+  dictionary's coverage of different professions can still correlate with protected characteristics.
+- Uploaded files are processed in memory for the session and are not written to disk or logged by this app.
+""")

@@ -1,0 +1,74 @@
+{
+  "fixture_features": {
+    "skill_coverage": 0.3333,
+    "num_matched_skills": 2,
+    "num_missing_skills": 4,
+    "tfidf_similarity": 0.3566,
+    "semantic_similarity": 0.2972,
+    "experience_compatibility": 0.5,
+    "education_compatibility": 0.5,
+    "title_category_compatibility": 0.5
+  },
+  "fixture_predict_match": {
+    "score_percent": 58.2,
+    "predicted_label": "moderate",
+    "method": "random_forest",
+    "class_probabilities": {
+      "moderate": 0.515,
+      "strong": 0.325,
+      "weak": 0.16
+    }
+  },
+  "demo_ranking": [
+    {
+      "rank": 1,
+      "candidate_id": "resume_1.txt",
+      "overall_score": 0.682,
+      "skill_score": 1.0,
+      "semantic_score": 0.7306,
+      "tfidf_score": 0.2935,
+      "matched_skills": [
+        "Machine Learning",
+        "Python",
+        "SQL",
+        "Scikit-learn",
+        "Statistics"
+      ],
+      "missing_skills": []
+    },
+    {
+      "rank": 2,
+      "candidate_id": "resume_3.txt",
+      "overall_score": 0.6,
+      "skill_score": 0.8,
+      "semantic_score": 0.4562,
+      "tfidf_score": 0.2377,
+      "matched_skills": [
+        "Machine Learning",
+        "Python",
+        "SQL",
+        "Scikit-learn"
+      ],
+      "missing_skills": [
+        "Statistics"
+      ]
+    },
+    {
+      "rank": 3,
+      "candidate_id": "resume_2.txt",
+      "overall_score": 0.56,
+      "skill_score": 0.6,
+      "semantic_score": 0.5052,
+      "tfidf_score": 0.0856,
+      "matched_skills": [
+        "Machine Learning",
+        "SQL",
+        "Statistics"
+      ],
+      "missing_skills": [
+        "Python",
+        "Scikit-learn"
+      ]
+    }
+  ]
+}

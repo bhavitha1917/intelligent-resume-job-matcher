@@ -1,111 +1,125 @@
-"""Phase 15 -- candidate ranking.
+"""Multi-resume candidate ranking.
 
-Ties together parsing, skill extraction, feature engineering, scoring,
-skill-gap analysis and explanation generation into one function used by
-both the Streamlit app and the evaluation notebooks.
+Every resume is scored with exactly the same function, job requirements,
+rubric and reference date as the Single Resume Analysis page
+(src.scoring.scorer.score_candidate), so a candidate's score here is
+identical to the score on their individual report.
+
+Every uploaded file produces exactly one row; nothing is dropped silently:
+    status "scored"                 -> ranked
+    status "insufficient_evidence"  -> listed after ranked rows, no rank
+    status "parse_failed"           -> listed, with the parser's reason
+    status "duplicate"              -> listed, pointing at the identical file
+                                       that was scored (scored once only)
+
+Tie rule (also in config/scoring_rubric.json): equal scores at the
+displayed precision share a rank (1, 2, 2, 4). Within a tie, rows are
+listed alphabetically by file name; that order carries no meaning.
 """
 
+import hashlib
+from datetime import date
+from pathlib import Path
 from typing import Callable, Optional
 
-from src.data.job_parser import parse_job_description_text
 from src.data.resume_parser import parse_resume
-from src.features.feature_engineering import build_feature_vector
-from src.matching.explainability import generate_explanation
-from src.matching.hybrid import compute_weighted_hybrid_score
-from src.matching.skill_gap import get_skill_gap
-from src.models.inference import load_final_model_artifacts, predict_match
+from src.scoring.config import load_rubric
+from src.scoring.requirements import extract_job_requirements
+from src.scoring.scorer import DEFAULT_SEMANTIC, score_candidate
 
 
-def _default_scorer(features: dict) -> float:
-    """Use the trained Random Forest (the final model selected in
-    src/models/train_supervised.py on validation performance) when its
-    artifacts are available; otherwise fall back to the transparent
-    weighted hybrid score so the app still works before training has run.
-    """
-    if load_final_model_artifacts() is not None:
-        return predict_match(features)["score_percent"] / 100.0
-    return compute_weighted_hybrid_score(features)
+def _content_hash(source) -> str:
+    if isinstance(source, Path) or (isinstance(source, str) and Path(source).exists() and "\n" not in source):
+        data = Path(source).read_bytes()
+    elif isinstance(source, bytes):
+        data = source
+    else:
+        data = str(source).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
 
 
-def _default_feature_importance() -> Optional[dict]:
-    artifacts = load_final_model_artifacts()
-    if artifacts is None:
-        return None
-    from src.models.inference import FEATURE_COLUMNS
+def build_job(job_description: str, requirements: Optional[list] = None, title: Optional[str] = None) -> dict:
+    """Job dict for the scorer. If `requirements` is None they are extracted
+    from the text (the app passes the user-reviewed list instead)."""
+    extracted = extract_job_requirements(job_description)
+    return {
+        "title": title or extracted["title"],
+        "text": job_description or "",
+        "requirements": extracted["requirements"] if requirements is None else requirements,
+        "extraction_warnings": extracted["warnings"],
+    }
 
-    model = artifacts["model"]
-    return dict(zip(FEATURE_COLUMNS, model.feature_importances_.tolist()))
+
+def assign_ranks(rows: list, decimals: int = 1) -> list:
+    """Standard competition ranking over scored rows; sorts in place."""
+    scored = sorted((r for r in rows if r["status"] == "scored"),
+                    key=lambda r: (-round(r["score"], decimals), str(r["candidate_id"]).lower()))
+    previous, rank = None, 0
+    for position, row in enumerate(scored, start=1):
+        key = round(row["score"], decimals)
+        if key != previous:
+            rank, previous = position, key
+        row["rank"] = rank
+        row["tied"] = False
+    for row in scored:
+        row["tied"] = sum(1 for other in scored if other["rank"] == row["rank"]) > 1
+    order = {"insufficient_evidence": 1, "parse_failed": 2, "duplicate": 3}
+    rest = sorted((r for r in rows if r["status"] != "scored"),
+                  key=lambda r: (order.get(r["status"], 9), str(r["candidate_id"]).lower()))
+    for row in rest:
+        row["rank"] = None
+        row["tied"] = False
+    return scored + rest
 
 
 def rank_candidates(
     job_description: str,
     resumes: list,
-    tfidf_vectorizer=None,
-    compute_semantic: bool = True,
-    scorer: Optional[Callable[[dict], float]] = None,
+    requirements: Optional[list] = None,
+    rubric: Optional[dict] = None,
+    semantic=DEFAULT_SEMANTIC,
+    compute_semantic: Optional[bool] = None,
+    reference_date: Optional[date] = None,
+    progress: Optional[Callable[[int, int, str], None]] = None,
 ) -> list:
-    """Rank N resumes against one job description.
+    """Score and rank N resumes against one job.
 
-    `resumes`: list of dicts, each with:
-        - "candidate_id": any hashable identifier for display
-        - "source": a file path, raw bytes, or raw text (see parse_resume)
-        - "filename": optional, required if source is bytes
-    `scorer`: optional callable(features_dict) -> float in [0, 1]; defaults
-    to the transparent weighted hybrid score. Pass a wrapped supervised
-    model's predict function here to rank with the learned model instead.
-
-    Returns a list of result dicts sorted by descending overall_score, each
-    with an added "rank" field (1 = best match).
+    `resumes`: list of {"candidate_id", "source" (path / bytes / text),
+    "filename" (needed when source is bytes)}.
+    `compute_semantic=False` is a shorthand for `semantic=None`.
+    `progress(i, n, candidate_id)` is called before each file is processed.
     """
-    job_parsed = parse_job_description_text(job_description)
-    score_fn = scorer or _default_scorer
-    feature_importance = _default_feature_importance() if scorer is None else None
+    rubric = rubric or load_rubric()
+    reference_date = reference_date or date.today()
+    if compute_semantic is False:
+        semantic = None
+    job = build_job(job_description, requirements)
 
-    results = []
-    for resume_entry in resumes:
-        candidate_id = resume_entry.get("candidate_id")
-        resume_parsed = parse_resume(resume_entry["source"], resume_entry.get("filename"))
+    rows = []
+    seen_hashes: dict[str, str] = {}
+    for i, entry in enumerate(resumes):
+        candidate_id = entry.get("candidate_id") or entry.get("filename") or f"candidate_{i + 1}"
+        if progress:
+            progress(i, len(resumes), candidate_id)
+        digest = _content_hash(entry["source"])
+        if digest in seen_hashes:
+            rows.append({"candidate_id": candidate_id, "status": "duplicate", "duplicate_of": seen_hashes[digest],
+                         "score": None, "band": "Duplicate file", "report": None,
+                         "parse_warnings": [f"Identical content to '{seen_hashes[digest]}'; scored once under that name."]})
+            continue
+        seen_hashes[digest] = candidate_id
 
-        feature_result = build_feature_vector(
-            resume_full_text=resume_parsed["full_text"],
-            job_description_text=job_parsed["description"],
-            required_skills=job_parsed["required_skills"],
-            preferred_skills=job_parsed["preferred_skills"],
-            resume_experience_text=resume_parsed["experience"],
-            job_experience_requirement=job_parsed["experience_requirement"],
-            resume_education_text=resume_parsed["education"],
-            job_education_requirement=job_parsed["education_requirement"],
-            tfidf_vectorizer=tfidf_vectorizer,
-            compute_semantic=compute_semantic,
-        )
-        features = feature_result["features"]
-        overall_score = score_fn(features)
+        parsed = parse_resume(entry["source"], entry.get("filename"))
+        if not (parsed["full_text"] or "").strip():
+            rows.append({"candidate_id": candidate_id, "status": "parse_failed", "score": None,
+                         "band": "Could not read file", "report": None, "parse_warnings": parsed["parse_warnings"]})
+            continue
 
-        skill_gap = get_skill_gap(
-            resume_parsed["full_text"], job_parsed["required_skills"], job_parsed["preferred_skills"]
-        )
-        explanation = generate_explanation(
-            features,
-            match_score=overall_score,
-            missing_required_skills=[item["skill"] for item in skill_gap["missing_required_skills"]],
-            feature_importance=feature_importance,
-        )
+        report = score_candidate(job, parsed, rubric=rubric, semantic=semantic,
+                                 reference_date=reference_date, candidate_id=candidate_id)
+        rows.append({"candidate_id": candidate_id, "status": report["status"], "score": report["score"],
+                     "band": report["band"], "report": report, "parse_warnings": parsed["parse_warnings"]})
 
-        results.append({
-            "candidate_id": candidate_id,
-            "overall_score": overall_score,
-            "skill_score": features["skill_coverage"],
-            "semantic_score": features["semantic_similarity"],
-            "tfidf_score": features["tfidf_similarity"],
-            "matched_skills": feature_result["matched_skills"],
-            "missing_skills": feature_result["missing_skills"],
-            "skill_gap": skill_gap,
-            "explanation": explanation,
-            "parse_warnings": resume_parsed["parse_warnings"],
-        })
-
-    results.sort(key=lambda r: r["overall_score"], reverse=True)
-    for i, result in enumerate(results, start=1):
-        result["rank"] = i
-
-    return results
+    if progress:
+        progress(len(resumes), len(resumes), "")
+    return assign_ranks(rows, rubric["ranking"]["score_decimals"])

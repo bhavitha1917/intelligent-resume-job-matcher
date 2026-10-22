@@ -1,147 +1,70 @@
-"""Feature engineering (spec.md section 16 / Phase 11).
+"""Feature engineering for the (optional, experimental) learned models.
 
-Builds a flat, structured feature dict per (resume, job) pair. Deliberately
-excludes any protected/PII attribute (name, gender, age, email, phone,
-address, religion, caste, nationality, marital status, photo) -- see
-spec.md section 27. All features here are derived purely from resume/job
-TEXT content.
+v2 features are derived ONLY from a scoring report produced by
+src.scoring.scorer.score_candidate, plus a TF-IDF similarity. Because the
+training pipeline and the app both build reports with the same function,
+required-skill canonicalization, matching, counting and coverage are
+identical at training and inference time by construction.
+
+Design rules:
+- No PII / protected attributes: reports are computed on sanitized text.
+- No job-identifying features: the v1 `job_description_length` and raw
+  skill counts (num_missing_skills varies mainly with the job's list
+  length) are dropped; only per-job-normalized fractions are used.
+- Missing information is explicit: every component that may be
+  inapplicable has a value (0.0 when inapplicable) AND an `_applicable`
+  0/1 indicator, instead of v1's silent 0.5 fallback.
 """
 
-import re
-from typing import Optional
+FEATURE_SCHEMA_VERSION = "v2"
 
-from src.matching.keyword_baseline import keyword_match
-from src.matching.semantic_similarity import semantic_similarity as compute_semantic_similarity
-from src.matching.tfidf_similarity import compute_tfidf_similarity
+FEATURE_COLUMNS = [
+    "required_skill_credit",
+    "required_skill_detected_fraction",
+    "required_skill_applied_fraction",
+    "experience_credit",
+    "experience_applicable",
+    "education_credit",
+    "education_applicable",
+    "certification_credit",
+    "certification_applicable",
+    "preferred_credit",
+    "preferred_applicable",
+    "semantic_similarity",
+    "tfidf_similarity",
+]
 
-_YEARS_RE = re.compile(r"(\d+)\+?\s*years?", re.IGNORECASE)
-
-_EDUCATION_LEVELS = {
-    "phd": 4, "ph.d": 4, "doctorate": 4,
-    "master": 3, "master's": 3, "msc": 3, "m.s.": 3,
-    "bachelor": 2, "bachelor's": 2, "bsc": 2, "b.s.": 2,
-    "associate": 1, "associate's": 1,
+_COMPONENT_FEATURES = {
+    "experience": "experience",
+    "education": "education",
+    "certifications": "certification",
+    "preferred_qualifications": "preferred",
 }
 
 
-def _word_count(text: str) -> int:
-    return len(text.split()) if text else 0
+def model_features_from_report(report: dict, tfidf_similarity: float) -> dict:
+    """Map one scoring report to the v2 feature dict (all keys of
+    FEATURE_COLUMNS, no None values)."""
+    components = {c["name"]: c for c in report["components"]}
+    required_skills = [r for r in report["requirements"] if r["kind"] == "skill" and r["importance"] == "required"]
+    n = len(required_skills)
+    detected = sum(r["result"]["status"] == "met" for r in required_skills)
+    applied = sum(r["result"].get("evidence_level") == "applied" for r in required_skills)
 
-
-def _max_years_mentioned(text: Optional[str]) -> Optional[int]:
-    if not text:
-        return None
-    matches = _YEARS_RE.findall(text)
-    return max((int(m) for m in matches), default=None)
-
-
-def _education_level(text: Optional[str]) -> Optional[int]:
-    if not text:
-        return None
-    lowered = text.lower()
-    levels_found = [level for keyword, level in _EDUCATION_LEVELS.items() if keyword in lowered]
-    return max(levels_found, default=None)
-
-
-def experience_compatibility(resume_experience_text: Optional[str], job_experience_requirement: Optional[str]) -> float:
-    """1.0 if candidate's mentioned years meet/exceed the requirement, a
-    partial score if below, or 0.5 (neutral/unknown) when either side
-    cannot be detected -- this is an explicit, documented assumption, not a
-    fabricated certainty.
-    """
-    required_years = _max_years_mentioned(job_experience_requirement)
-    candidate_years = _max_years_mentioned(resume_experience_text)
-
-    if required_years is None or candidate_years is None:
-        return 0.5
-    if required_years == 0:
-        return 1.0
-    return min(1.0, candidate_years / required_years)
-
-
-def education_compatibility(resume_education_text: Optional[str], job_education_requirement: Optional[str]) -> float:
-    """Same neutral-when-unknown convention as experience_compatibility."""
-    required_level = _education_level(job_education_requirement)
-    candidate_level = _education_level(resume_education_text)
-
-    if required_level is None or candidate_level is None:
-        return 0.5
-    if candidate_level >= required_level:
-        return 1.0
-    return max(0.0, candidate_level / required_level)
-
-
-def title_category_compatibility(resume_category: Optional[str], job_title: Optional[str]) -> float:
-    """Token-overlap compatibility between a resume's dataset category
-    label (e.g. 'INFORMATION-TECHNOLOGY') and the job title. 0.5 (neutral)
-    when either is unavailable -- this feature is explicitly "where
-    reliable" per spec.md section 16, not a hard requirement.
-    """
-    if not resume_category or not job_title:
-        return 0.5
-    cat_tokens = set(re.split(r"[-_\s]+", resume_category.lower()))
-    title_tokens = set(re.split(r"[-_\s/]+", job_title.lower()))
-    if not cat_tokens or not title_tokens:
-        return 0.5
-    overlap = cat_tokens & title_tokens
-    return round(len(overlap) / len(title_tokens), 4) if title_tokens else 0.5
-
-
-def build_feature_vector(
-    resume_full_text: str,
-    job_description_text: str,
-    required_skills: list,
-    preferred_skills: Optional[list] = None,
-    resume_experience_text: Optional[str] = None,
-    job_experience_requirement: Optional[str] = None,
-    resume_education_text: Optional[str] = None,
-    job_education_requirement: Optional[str] = None,
-    resume_category: Optional[str] = None,
-    job_title: Optional[str] = None,
-    tfidf_vectorizer=None,
-    compute_semantic: bool = True,
-) -> dict:
-    """Assemble the full matching feature vector for one (resume, job) pair.
-
-    `tfidf_vectorizer`: a pre-fit TfidfVectorizer (required for leakage-safe
-    evaluation; falls back to an ad-hoc single-pair fit if None, which is
-    acceptable only for interactive single-pair inference, not training).
-    `compute_semantic`: set False to skip the (comparatively slow)
-    sentence-transformer call, e.g. in unit tests.
-    """
-    required_match = keyword_match(resume_full_text, required_skills)
-    preferred_match = (
-        keyword_match(resume_full_text, preferred_skills) if preferred_skills else None
-    )
-
-    if tfidf_vectorizer is not None:
-        tfidf_sim = compute_tfidf_similarity(resume_full_text, job_description_text, tfidf_vectorizer)
-    else:
-        from src.matching.tfidf_similarity import compute_tfidf_similarity_adhoc
-        tfidf_sim = compute_tfidf_similarity_adhoc(resume_full_text, job_description_text)
-
-    semantic_sim = (
-        compute_semantic_similarity(resume_full_text, job_description_text) if compute_semantic else None
-    )
-
+    skill_component = components["required_skills"]
     features = {
-        "skill_coverage": required_match["skill_coverage"],
-        "num_matched_skills": len(required_match["matched_skills"]),
-        "num_missing_skills": len(required_match["missing_skills"]),
-        "preferred_skill_coverage": preferred_match["skill_coverage"] if preferred_match else None,
-        "tfidf_similarity": tfidf_sim,
-        "semantic_similarity": semantic_sim,
-        "resume_length": _word_count(resume_full_text),
-        "job_description_length": _word_count(job_description_text),
-        "experience_compatibility": experience_compatibility(resume_experience_text, job_experience_requirement),
-        "education_compatibility": education_compatibility(resume_education_text, job_education_requirement),
-        "title_category_compatibility": title_category_compatibility(resume_category, job_title),
+        "required_skill_credit": float(skill_component["value"]) if skill_component["applicable"] else 0.0,
+        "required_skill_detected_fraction": detected / n if n else 0.0,
+        "required_skill_applied_fraction": applied / n if n else 0.0,
     }
+    for component_name, prefix in _COMPONENT_FEATURES.items():
+        comp = components[component_name]
+        features[f"{prefix}_credit"] = float(comp["value"]) if comp["applicable"] else 0.0
+        features[f"{prefix}_applicable"] = 1.0 if comp["applicable"] else 0.0
 
-    return {
-        "features": features,
-        "matched_skills": required_match["matched_skills"],
-        "missing_skills": required_match["missing_skills"],
-        "matched_preferred_skills": preferred_match["matched_skills"] if preferred_match else [],
-        "missing_preferred_skills": preferred_match["missing_skills"] if preferred_match else [],
-    }
+    semantic_raw = report["semantic"]["raw"]
+    if semantic_raw is None:
+        raise ValueError("The v2 learned models require semantic similarity; it was unavailable for this report.")
+    features["semantic_similarity"] = float(semantic_raw)
+    features["tfidf_similarity"] = float(tfidf_similarity)
+    return features

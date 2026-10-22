@@ -1,0 +1,37 @@
+{
+  "feature_schema_version": "v2",
+  "feature_columns": [
+    "required_skill_credit",
+    "required_skill_detected_fraction",
+    "required_skill_applied_fraction",
+    "experience_credit",
+    "experience_applicable",
+    "education_credit",
+    "education_applicable",
+    "certification_credit",
+    "certification_applicable",
+    "preferred_credit",
+    "preferred_applicable",
+    "semantic_similarity",
+    "tfidf_similarity"
+  ],
+  "class_labels": [
+    "weak",
+    "moderate",
+    "strong"
+  ],
+  "label_definition": "ai_match_score >= 70 strong; >= 40 moderate; else weak (dataset-generated score, not a recruiter decision)",
+  "display_model": "random_forest",
+  "display_model_choice": "Random Forest was kept as the displayed model because it was the v1 choice; it was NOT re-selected using the v2 evaluation results.",
+  "trained_on": {
+    "dataset": "batuhanmtl/job_resume_fit",
+    "rows": 2383,
+    "jobs": 23
+  },
+  "dataset_reference_date": "2025-01-01",
+  "rubric_version": "2.0.0",
+  "rubric_fingerprint": "62fcd137a459",
+  "semantic_model": "all-MiniLM-L6-v2",
+  "sklearn_version": "1.9.1",
+  "trained_at": "2026-10-22"
+}

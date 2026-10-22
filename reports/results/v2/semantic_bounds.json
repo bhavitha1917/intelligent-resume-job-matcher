@@ -1,0 +1,8 @@
+{
+  "p05": 0.2345,
+  "p95": 0.7003,
+  "n_pairs": 2383,
+  "labels_used": false,
+  "config_low": 0.23,
+  "config_high": 0.7
+}
