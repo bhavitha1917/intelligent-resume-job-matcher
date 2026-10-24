@@ -31,6 +31,33 @@ def test_static_pages_render(page):
     _no_exceptions(_run(page))
 
 
+def _markdown_text(at):
+    return " ".join(m.value for m in at.markdown)
+
+
+def test_welcome_screen_then_enter_shows_existing_homepage():
+    at = _run("app.py")
+    _no_exceptions(at)
+    text = _markdown_text(at)
+    assert "Resume–Job Matching" in text and "Every skill matters. Every match has a reason." in text
+    assert "Find the right fit" not in text  # homepage not shown yet
+    assert [b.label for b in at.button] == ["Enter the App"]
+
+    at.button(key="enter_app").click().run()
+    _no_exceptions(at)
+    text = _markdown_text(at)
+    assert "Find the right fit. Understand every match." in text
+    assert "Analyze a resume" in text and "Compare candidates" in text
+    assert at.session_state["entered_app"] is True
+    # Card links point at the existing pages.
+    links = [link.proto.page for link in at.get("page_link")]
+    assert "Single_Resume_Analysis" in links and "Candidate_Ranking" in links
+
+    # Returning to Home later in the session skips the welcome screen.
+    at.run()
+    assert "Find the right fit" in _markdown_text(at)
+
+
 def test_single_resume_page_end_to_end_with_demo_data():
     at = _run("pages/1_Single_Resume_Analysis.py")
     at.radio(key="single_jd_source").set_value("Demo job").run()

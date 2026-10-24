@@ -22,10 +22,25 @@
 html, body, [class*="css"] { -webkit-text-size-adjust: 100%; }
 
 /* ---------- typography & spacing ---------- */
-.block-container { padding-top: 2.5rem; padding-bottom: 4rem; }
-h1 { letter-spacing: -0.01em; color: var(--ink); }
+/* Streamlit draws a fixed top header (~3.75rem). The top padding must always
+   clear it, or the first element (the home hero) is drawn underneath it. */
+[data-testid="stMainBlockContainer"], .block-container {
+  padding-top: calc(3.75rem + clamp(1rem, 3vw, 2rem));
+  padding-bottom: 4rem;
+}
+/* Fluid type: scales with the viewport, so no mobile-only !important overrides. */
+/* Selectors match the specificity of Streamlit's own heading rules
+   ([data-testid] h1), so these win by source order without !important. */
+h1, [data-testid="stHeading"] h1, [data-testid="stMarkdownContainer"] h1 {
+  letter-spacing: -0.01em; color: var(--ink); font-size: clamp(1.55rem, 1.1rem + 2.2vw, 2.4rem); line-height: 1.2;
+}
+h2, [data-testid="stHeading"] h2, [data-testid="stMarkdownContainer"] h2 { font-size: clamp(1.3rem, 1.05rem + 1.2vw, 1.75rem); }
+h3, [data-testid="stHeading"] h3, [data-testid="stMarkdownContainer"] h3 { font-size: clamp(1.1rem, 0.95rem + 0.8vw, 1.4rem); }
 h2, h3 { color: var(--ink); }
 h3 { margin-top: 1.2rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--line); }
+/* Long words, URLs and resume excerpts wrap instead of widening the page. */
+[data-testid="stMarkdownContainer"], [data-testid="stCaptionContainer"] { overflow-wrap: anywhere; }
+[data-testid="stMetricValue"] > div { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
 h4 { color: var(--lav-700); margin-top: 1.1rem; }
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color: var(--muted) !important; opacity: 1 !important; }
 hr { border-color: var(--line) !important; }
@@ -59,13 +74,13 @@ hr { border-color: var(--line) !important; }
 [data-testid="stExpander"] summary:hover { background: var(--lav-50); }
 
 /* ---------- inputs ---------- */
-.stButton > button, .stDownloadButton > button { min-height: 44px; font-weight: 600; }
-.stButton > button[kind="secondary"], .stDownloadButton > button {
+.stButton button, .stDownloadButton button { min-height: 44px; font-weight: 600; }
+.stButton button[kind="secondary"], [data-testid="stBaseButton-secondary"], .stDownloadButton button {
   background: var(--card);
   border-color: var(--line);
   color: var(--lav-700);
 }
-.stButton > button[kind="secondary"]:hover, .stDownloadButton > button:hover {
+.stButton button[kind="secondary"]:hover, [data-testid="stBaseButton-secondary"]:hover, .stDownloadButton button:hover {
   border-color: var(--lav-600);
   background: var(--lav-50);
 }
@@ -77,16 +92,68 @@ hr { border-color: var(--line) !important; }
 [data-testid="stFileUploaderDropzone"]:hover { border-color: var(--lav-600); }
 [data-testid="stDataFrame"], [data-testid="stDataFrameResizable"] { border-radius: 0.6rem; }
 
-/* ---------- home intro ---------- */
+/* ---------- home page ---------- */
 .hero {
   background: linear-gradient(135deg, var(--lav-100) 0%, var(--blue-100) 100%);
   border: 1px solid var(--line);
   border-radius: 1rem;
-  padding: 1.4rem 1.5rem;
-  margin: 0.25rem 0 1.25rem 0;
+  padding: clamp(1.1rem, 3vw, 2rem) clamp(1rem, 3.5vw, 2rem);
+  margin: 0 0 1.25rem 0;
 }
-.hero h1 { margin: 0 0 0.35rem 0; padding: 0; font-size: 2.1rem; }
-.hero p { margin: 0; color: var(--muted); font-size: 1.02rem; }
+.hero h1 { margin: 0 0 0.6rem 0; padding: 0; }
+.hero .hero-eyebrow {
+  margin: 0 0 0.45rem 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lav-700);
+}
+.hero .hero-text { margin: 0; color: var(--muted); font-size: clamp(0.95rem, 0.9rem + 0.3vw, 1.08rem); line-height: 1.55; max-width: 42rem; }
+
+/* Welcome screen (shown once per session before the homepage). */
+.st-key-welcome_screen {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+}
+.welcome { max-width: 32rem; margin: 0 auto; }
+/* Streamlit's markdown wrapper sets its own alignment; centre everything on this screen. */
+.st-key-welcome_screen [data-testid="stMarkdownContainer"], .st-key-welcome_screen [data-testid="stMarkdownContainer"] * { text-align: center; }
+.welcome-icon { width: 4.5rem; height: 4.5rem; margin: 0 auto 1.25rem auto; display: block; }
+.welcome .welcome-eyebrow {
+  margin: 0 0 0.6rem 0; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--lav-700);
+}
+.welcome h1 { margin: 0 0 0.75rem 0; padding: 0; }
+.st-key-welcome_screen [data-testid="stHeaderActionElements"] { display: none; }
+.welcome .welcome-tagline {
+  margin: 0 0 0.75rem 0; font-size: clamp(1.05rem, 0.95rem + 0.6vw, 1.3rem);
+  font-weight: 600; color: var(--lav-600); line-height: 1.4;
+}
+.welcome .welcome-text { margin: 0 auto 0.5rem auto; color: var(--muted); line-height: 1.6; max-width: 26rem; }
+.st-key-welcome_screen .stButton { display: flex; justify-content: center; }
+.st-key-welcome_screen .stButton button { min-width: 12rem; min-height: 48px; padding: 0 1.5rem; font-size: 1.02rem; }
+[data-testid="stMarkdownContainer"] p.welcome-footer { margin: 0.75rem 0 0 0; font-size: 0.8rem; color: var(--muted); letter-spacing: 0.02em; }
+
+/* Entry-point cards: keyed containers (st.container(key=...) adds .st-key-<key>). */
+.st-key-home_card_analyze, .st-key-home_card_compare {
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem 0.6rem 1.1rem;
+  box-shadow: var(--shadow);
+  height: 100%;
+}
+.st-key-home_card_analyze { background: var(--lav-50); border-top: 3px solid var(--lav-600); }
+.st-key-home_card_compare { background: #F4F8FC; border-top: 3px solid var(--blue-500); }
+.card-title { margin: 0 0 0.3rem 0; font-weight: 700; font-size: 1.08rem; color: var(--ink); }
+.card-text { margin: 0 0 0.4rem 0; color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+[data-testid="stPageLink"] a { min-height: 44px; display: flex; align-items: center; }
+[data-testid="stPageLink"] a span { color: var(--lav-700); font-weight: 600; }
 
 /* ---------- report: requirements, evidence, status chips ---------- */
 .req-line { margin: 0.45rem 0 0.15rem 0; line-height: 1.5; overflow-wrap: anywhere; }
@@ -122,14 +189,14 @@ hr { border-color: var(--line) !important; }
 .component-points { color: var(--lav-700); font-weight: 700; }
 
 /* ---------- small screens (Android Chrome) ---------- */
+/* Headings are fluid (clamp above); only spacing and touch targets change here.
+   Top padding is NOT reduced below the fixed header height. */
 @media (max-width: 640px) {
-  .block-container { padding: 1rem 0.75rem 3rem 0.75rem !important; }
-  h1 { font-size: 1.6rem !important; }
-  h2 { font-size: 1.3rem !important; }
-  h3 { font-size: 1.1rem !important; }
-  .hero { padding: 1rem; }
-  .hero h1 { font-size: 1.5rem !important; }
-  .stButton > button, .stDownloadButton > button { width: 100%; }
-  [data-testid="stMetricValue"] { font-size: 1.6rem; }
+  [data-testid="stMainBlockContainer"], .block-container { padding-left: 1rem; padding-right: 1rem; padding-bottom: 3rem; }
+  .hero { border-radius: 0.8rem; margin-bottom: 1rem; }
+  .st-key-home_card_analyze, .st-key-home_card_compare { padding: 0.9rem 0.95rem 0.5rem 0.95rem; }
+  .stButton button, .stDownloadButton button { width: 100%; }
+  [data-testid="stMetricValue"] { font-size: 1.5rem; }
   .evidence { margin-left: 0.4rem; }
+  .chip { white-space: normal; }
 }
